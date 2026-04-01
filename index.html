@@ -709,14 +709,22 @@ function showApp(nomEntreprise) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').classList.add('visible');
   document.getElementById('ss-name').textContent = nomEntreprise || '';
+
   const sbn = document.getElementById('sidebar-ss-name');
   if (sbn) sbn.textContent = nomEntreprise || '';
+
+  // 🔐 garde toujours l'URL API en mémoire
+  if (API_URL) {
+    sessionStorage.setItem('tc_api_url', API_URL);
+  }
+
   if (DEMO_MODE) {
     const pill = document.getElementById('demo-pill');
     const btn = document.getElementById('btn-logout');
     if (pill) pill.style.display = 'inline-flex';
     if (btn) btn.style.display = 'none';
   }
+
   initApp();
 }
 
@@ -760,15 +768,36 @@ window.onload = () => {
 // ════════════════════════════════════════════════════════════════════
 //  API
 // ════════════════════════════════════════════════════════════════════
-async function api(action, params={}) {
+async function api(action, params = {}) {
   if (DEMO_MODE) return demoApi(action, params);
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action, ...params })
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+
+  // 🔐 Sécurité : recharge l'URL API depuis la session si elle a sauté
+  if (!API_URL) {
+    API_URL = sessionStorage.getItem('tc_api_url') || '';
+  }
+
+  // ❌ si toujours vide => session perdue
+  if (!API_URL) {
+    throw new Error("Session expirée. Merci de vous reconnecter.");
+  }
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action, ...params })
+    });
+
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
+    }
+
+    return await res.json();
+
+  } catch (e) {
+    console.error("Erreur API :", e);
+    throw new Error("Impossible de joindre Google Sheets : " + e.message);
+  }
 }
 
 async function masterApi(action, params={}) {
