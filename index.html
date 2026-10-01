@@ -678,7 +678,7 @@ async function doLogin() {
     if (data.ok) {
       btn.querySelector('.btn-login-text').textContent = '✅ Connexion réussie…';
       API_URL = data.webappUrl || DIRECT_API_URL;
-      PREFETCH = null; FULL_SYNC_STARTED = false; SESSION_ID = Date.now(); INIT_TAB = 'chaud'; // nouvelle session → sync à refaire
+      PREFETCH = null; FULL_SYNC_STARTED = false; SESSION_ID = Date.now(); DATA_REV = 0; INIT_TAB = 'chaud'; // nouvelle session → sync à refaire
       // Persiste au refresh, effacé à la fermeture de l'onglet/navigateur
       sessionStorage.setItem('tc_api_url', API_URL);
       sessionStorage.setItem('tc_nom', data.nom || id || 'TempClean');
@@ -749,6 +749,7 @@ function logout() {
   // Stoppe le keepalive et invalide tout refresh d'arrière-plan en cours
   if (KEEPALIVE_TIMER) { clearInterval(KEEPALIVE_TIMER); KEEPALIVE_TIMER = null; }
   SESSION_ID++;
+  DATA_REV = 0;
   BG_REFRESH = null;
   Object.keys(stateFetchers).forEach(k => delete stateFetchers[k]);
   Object.keys(recFetchers).forEach(k => delete recFetchers[k]);
@@ -794,7 +795,7 @@ window.onload = () => {
 // ════════════════════════════════════════════════════════════════════
 //  API
 // ════════════════════════════════════════════════════════════════════
-async function api(action, params = {}) {
+async function api(action, params = {}, opts = {}) {
   if (DEMO_MODE) return demoApi(action, params);
 
   // 🔐 Sécurité : recharge l'URL API depuis la session si elle a sauté
@@ -808,11 +809,12 @@ async function api(action, params = {}) {
   }
 
   try {
+    await acquireApiSlot();
     const res = await fetchWithRetry(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action, ...params })
-    });
+    }, opts.attempts || 2, opts.timeout || API_TIMEOUT_MS);
 
     if (!res.ok) {
       if (res.status === 404) {
@@ -826,42 +828,52 @@ async function api(action, params = {}) {
   } catch (e) {
     console.error("Erreur API :", e);
     throw new Error("Impossible de joindre Google Sheets : " + e.message);
+  } finally {
+    releaseApiSlot();
   }
 }
 
-// 🔄 Retry automatique : les /exec Apps Script renvoient parfois des 404/500
-// transitoires (flakiness connue de Google) et peuvent mettre 10-30 s à
-// démarrer (cold start). On réessaie jusqu'à 4 fois, chaque tentative a un
-// timeout de 30 s (AbortController) pour ne jamais rester bloqué à l'infini.
-// Sans risque même pour les écritures : le backend lit la DERNIÈRE valeur de
-// chaque clé, donc un doublon d'écriture est inoffensif.
-const API_TIMEOUT_MS = 30000;
+// 2 tentatives max. L'ancien 4 × 30 s transformait un Google lent en 2 minutes
+// d'attente, et chaque retry relançait une exécution Apps Script.
+const API_TIMEOUT_MS = 25000;
+let API_SLOTS = 0;
+const API_SLOT_MAX = 2;
+const API_WAITERS = [];
+function acquireApiSlot() {
+  if (API_SLOTS < API_SLOT_MAX) { API_SLOTS++; return Promise.resolve(); }
+  return new Promise(function(resolve) { API_WAITERS.push(resolve); });
+}
+function releaseApiSlot() {
+  const next = API_WAITERS.shift();
+  if (next) next();
+  else API_SLOTS = Math.max(0, API_SLOTS - 1);
+}
 
 function setApiStatus(txt) {
   const el = document.getElementById('api-status');
   if (el) el.textContent = txt;
 }
 
-async function fetchWithRetry(url, options, maxAttempts = 4) {
+async function fetchWithRetry(url, options, maxAttempts = 2, timeoutMs = API_TIMEOUT_MS) {
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    if (attempt > 1) setApiStatus(`Tentative ${attempt}/${maxAttempts}…`);
+    if (attempt > 1) setApiStatus('Tentative ' + attempt + '/' + maxAttempts + '…');
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       const transient = res.status === 404 || res.status === 429 || res.status >= 500;
       if (transient && attempt < maxAttempts) {
-        console.warn(`API transitoire HTTP ${res.status}, nouvelle tentative ${attempt + 1}/${maxAttempts}…`);
-        await new Promise(r => setTimeout(r, 1000 * attempt + Math.random() * 600));
+        console.warn('API transitoire HTTP ' + res.status + ', nouvelle tentative ' + (attempt + 1) + '/' + maxAttempts + '…');
+        await new Promise(r => setTimeout(r, 800 * attempt));
         continue;
       }
       return res;
     } catch (e) {
-      lastErr = (e && e.name === 'AbortError') ? new Error('Délai dépassé (' + (API_TIMEOUT_MS/1000) + ' s)') : e;
+      lastErr = (e && e.name === 'AbortError') ? new Error('Délai dépassé (' + Math.round(timeoutMs / 1000) + ' s)') : e;
       if (attempt < maxAttempts) {
-        console.warn(`Échec tentative ${attempt}/${maxAttempts} (${lastErr.message}), réessai…`);
-        await new Promise(r => setTimeout(r, 1000 * attempt + Math.random() * 600));
+        console.warn('Échec tentative ' + attempt + '/' + maxAttempts + ' (' + lastErr.message + '), réessai…');
+        await new Promise(r => setTimeout(r, 800 * attempt));
         continue;
       }
       throw lastErr;
@@ -922,11 +934,13 @@ function clearCache() {
 let INIT_TAB = 'chaud'; // onglet affiché au démarrage
 let FULL_SYNC_STARTED = false; // (compat) une synchro complète a-t-elle déjà été demandée ?
 let SESSION_ID = 0; // incrémenté à chaque connexion/déconnexion (annule les refresh périmés)
+let DATA_REV = 0;   // > 0 si l'utilisateur a modifié l'onglet affiché pendant un refresh
 
 function startBootstrapPrefetch() {
   if (DEMO_MODE || !API_URL || PREFETCH) return;
-  const sheetName = SHEET_NAMES[INIT_TAB];
-  PREFETCH = api('bootstrap', sheetName ? { state: sheetName } : {}).catch(() => null); // échec silencieux : initApp relancera
+  // UNE requête pour tous les modules. Le filtre "1 feuille" relançait une
+  // lecture complète de _DATA par onglet et saturait Apps Script.
+  PREFETCH = api('bootstrap', {}, { attempts: 1, timeout: 45000 }).catch(() => null);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -961,8 +975,8 @@ function ensureStateFetched(tab, key, force) {
   const p = (async () => {
     let raw;
     if (BOOTSTRAP_OK) {
-      const r = await api('bootstrap', { state: key }); // réponse légère : 1 feuille
-      if (r && r.ok) raw = (r.states || {})[key];
+      const r = await api('bootstrap', { state: key }, { attempts: 1, timeout: 30000 });
+      if (r && r.ok) raw = (r.states && r.states[key]) || {};
     }
     if (raw === undefined) {
       // Ancien backend (sans bootstrap/light) ou feuille encore vide → action dédiée
@@ -1027,58 +1041,45 @@ async function openStateTab(tab) {
 
 function retryOpenTab(tab) { loadAndRender(tab); }
 
-// 🔄 Rafraîchissement silencieux de TOUTES les données en arrière-plan, juste
-// après le 1er affichage. Petites requêtes par feuille, 3 en parallèle max : rien
-// ne sature la connexion ni la file d'exécution d'Apps Script, et l'onglet affiché
-// n'est jamais interrompu ni re-rendu.
-function scheduleBgRefresh() {
+// Un seul rafraîchissement en arrière-plan (quand l'écran vient du cache).
+// Plus de 3 workers × N feuilles : ça remplissait la file Apps Script et les
+// modules restaient blancs plusieurs minutes.
+function mergeFreshBootstrap(r) {
+  if (!r || !r.ok) return;
+  const keepKey = pendingStateTab(S.tab);
+  const keepLocal = (DATA_REV > 0 && keepKey && S.states[keepKey]) ? S.states[keepKey] : null;
+  if (r.states) S.states = r.states;
+  if (keepLocal && keepKey) S.states[keepKey] = keepLocal;
+  if (r.appareils) S.appareils = r.appareils;
+  Object.keys(SHEET_NAMES).forEach(tab => {
+    const st = S.states[SHEET_NAMES[tab]];
+    if (st && st._comment) S.comments[tab] = st._comment;
+  });
+  updateAppareilsTabs();
+  saveCache({ ok: true, appareils: S.appareils || [], states: S.states || {} });
+  const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (!typing && !keepLocal && keepKey) {
+    applyTabState(S.tab, keepKey, S.states[keepKey] || {});
+    S.loaded.add(S.tab);
+    renderTab(S.tab);
+  }
+  S.loaded.forEach(t => {
+    if (t !== S.tab && (SHEET_NAMES[t] || t === 'biannuel' || t.startsWith('app_'))) S.loaded.delete(t);
+  });
+  connRetryCount = 0;
+}
+
+function scheduleBgRefresh(pending) {
   if (BG_REFRESH) return BG_REFRESH;
   const sid = SESSION_ID;
   const p = (async () => {
-    let okCount = 0, failStreak = 0;
-    // 1) Liste des appareils à jour (nouveaux onglets compris) — silencieux si échec
     try {
-      const g = await api('getAppData');
-      if (g && g.ok) {
-        if (JSON.stringify(g.appareils || []) !== JSON.stringify(S.appareils || [])) {
-          S.appareils = g.appareils || [];
-          updateAppareilsTabs();
-        }
-      }
-    } catch (e) { /* silencieux */ }
-    // 2) États de toutes les feuilles (une petite requête chacune)
-    const keys = [];
-    Object.keys(SHEET_NAMES).forEach(t => keys.push(SHEET_NAMES[t]));
-    keys.push('Fréquences Bi-Annuelles');
-    (S.appareils || []).forEach(a => { if (a.actif) keys.push('App_' + a.id); });
-    let idx = 0;
-    const worker = async () => {
-      while (idx < keys.length && failStreak < 3) {
-        const key = keys[idx++];
-        const tab = tabForStateKey(key);
-        if (!tab) continue;
-        try { await ensureStateFetched(tab, key, true); okCount++; failStreak = 0; }
-        catch (e) { failStreak++; }
-      }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-    // 3) Enregistrements (prélèvements, pesées, machines, congélateur) en pré-charge
-    for (const rec of ['prelevements', 'pesees', 'maintenance', 'freezer']) {
-      if (failStreak >= 3 || S.loaded.has(rec) || S.tab === rec) continue;
-      try { await ensureRecordsFetched(rec); S.loaded.add(rec); okCount++; failStreak = 0; }
-      catch (e) { failStreak++; }
-    }
-    if (sid !== SESSION_ID) return; // déconnexion entre-temps → on abandonne
-    // 4) Les onglets non affichés reliront le cache frais au prochain clic
-    S.loaded.forEach(t => {
-      if (t !== S.tab && (SHEET_NAMES[t] || t === 'biannuel' || t.startsWith('app_'))) S.loaded.delete(t);
-    });
-    if (okCount > 0) {
-      saveCache({ ok: true, appareils: S.appareils || [], states: S.states || {} });
-      connRetryCount = 0;
-      setApiStatus('');
-      toast('✅ Données à jour');
-    }
+      let r = pending ? await pending : null;
+      if (sid !== SESSION_ID) return;
+      if (!r || !r.ok) r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
+      if (sid !== SESSION_ID) return;
+      mergeFreshBootstrap(r);
+    } catch (e) { /* rafraîchissement silencieux */ }
   })();
   p.finally(() => { if (BG_REFRESH === p) BG_REFRESH = null; });
   BG_REFRESH = p;
@@ -1319,6 +1320,14 @@ function demoNextRow(rows){ return rows.length ? Math.max(...rows.map(r => Numbe
 async function demoApi(action, params={}){
   switch(action){
     case 'ping': return { ok:true };
+    case 'bootstrap': {
+      const states = {};
+      Object.keys(DEMO_STORE.hebdo || {}).forEach(k => { states[k] = deepClone(DEMO_STORE.hebdo[k]); });
+      states['Fréquences Bi-Annuelles'] = deepClone(DEMO_STORE.biannuel || {});
+      Object.keys(DEMO_STORE.appStates || {}).forEach(id => { states['App_' + id] = deepClone(DEMO_STORE.appStates[id]); });
+      const only = params.state;
+      return { ok:true, appareils:deepClone(DEMO_STORE.appareils), states: only ? (states[only] ? { [only]: states[only] } : {}) : states };
+    }
     case 'getAppData': return { appareils:deepClone(DEMO_STORE.appareils), comments:deepClone(DEMO_STORE.comments), meta:deepClone(DEMO_STORE.appMeta) };
     case 'loadHebdoState': return deepClone(DEMO_STORE.hebdo[params.sheetName] || {});
     case 'loadBiannuelState': return deepClone(DEMO_STORE.biannuel);
@@ -1533,24 +1542,30 @@ function refreshInBackground() { scheduleBgRefresh(); }
 
 async function initApp() {
   const c = document.getElementById('main-content');
-  c.innerHTML = '<div class="loading"><div class="spinner"></div><span id="api-status">Connexion...</span></div>';
+  const cached = loadCache();
+  if (cached && cached.ok) {
+    applyBootstrap(cached);
+    const pending = PREFETCH;
+    PREFETCH = null;
+    scheduleBgRefresh(pending);
+    return;
+  }
+  if (!paintArrivalShell()) {
+    c.innerHTML = '<div class="loading"><div class="spinner"></div><span id="api-status">Connexion...</span></div>';
+  }
   try {
-    // ⚡ 1) Une réponse bootstrap est déjà en vol (préfetch au login / ouverture) ?
     let r = null;
     if (PREFETCH) { r = await PREFETCH; PREFETCH = null; }
-    // ⚡ 2) Sinon : affichage instantané depuis le cache local + refresh arrière-plan
     if (!r || !r.ok) {
-      const cached = loadCache();
-      if (cached && cached.ok) {
-        FULL_SYNC_STARTED = false; // le refresh va relancer la sync complète
-        applyBootstrap(cached);
-        refreshInBackground();
+      const late = loadCache();
+      if (late && late.ok) {
+        applyBootstrap(late);
+        scheduleBgRefresh(null);
         return;
       }
+      if (!r) r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
     }
-    if (!r) r = await api('bootstrap', SHEET_NAMES[INIT_TAB] ? { state: SHEET_NAMES[INIT_TAB] } : {});
-    if (!r.ok && String(r.error || '').indexOf('bootstrap') !== -1) {
-      // Ancien backend pas encore redéployé → mode compatible (requêtes séparées)
+    if (r && !r.ok && String(r.error || '').indexOf('bootstrap') !== -1) {
       BOOTSTRAP_OK = false;
       r = await api('ping');
       if (r.ok) {
@@ -1558,13 +1573,24 @@ async function initApp() {
         r = { ok: true, appareils: d.appareils || [], states: {} };
       }
     }
-    if (!r.ok) { showConnError(r.error); return; }
-    connRetryCount = 0; // succès → réinitialise le compteur d'échecs consécutifs
+    if (!r || !r.ok) { showConnError((r && r.error) || 'Réponse vide'); return; }
+    connRetryCount = 0;
     if (BOOTSTRAP_OK && r.states) saveCache(r);
     applyBootstrap(r);
-    // ⚡ Les autres feuilles sont récupérées en silence, par petites requêtes légères
-    scheduleBgRefresh();
   } catch(e) { showConnError(e.message); }
+}
+
+function paintArrivalShell() {
+  const tab = INIT_TAB || 'chaud';
+  if (!pendingStateTab(tab) || String(tab).indexOf('app_') === 0) return false;
+  S.tab = tab;
+  renderTab(tab);
+  const c = document.getElementById('main-content');
+  const banner = document.createElement('div');
+  banner.className = 'hydrate-banner';
+  banner.innerHTML = '<span class="mini-spin"></span> Connexion…';
+  if (c) c.insertBefore(banner, c.firstChild);
+  return true;
 }
 
 let connRetryTimer = null;
@@ -2848,30 +2874,33 @@ function buildCard(app,actif){
 //  ACTIONS CHECKBOX
 // ════════════════════════════════════════════════════════════════════
 async function tick(tabId,itemName,itemIdx,day,val){
+  DATA_REV++;
   if(!S.checks[tabId])S.checks[tabId]={};
   const stateKey=itemName==='BIO'?'BIO__'+day:'i'+itemIdx+'__'+day;
   const backendKey=itemName==='BIO'?'BIO':'i'+itemIdx;
-  S.checks[tabId][stateKey]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][backendKey]=val;updateProg(tabId);toast(val?'✅ Coché':'☐ Décoché');
+  S.checks[tabId][stateKey]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][backendKey+'__'+day]=val;updateProg(tabId);toast(val?'✅ Coché':'☐ Décoché');
   try{const r=await api('saveHebdo',{sheetName:SHEET_NAMES[tabId],itemName:backendKey,day,value:val});if(r&&!r.ok)toast('⚠️ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}
 }
 async function tickBi(itemIdx,monthIndex,val){
+  DATA_REV++;
   if(!S.checks['biannuel'])S.checks['biannuel']={};
   const stateKey=itemIdx===-1?'BIO__'+monthIndex:'i'+itemIdx+'__'+monthIndex;
   const backendKey=itemIdx===-1?'BIO':'i'+itemIdx;
-  S.checks['biannuel'][stateKey]=val;if(S.states['Fréquences Bi-Annuelles'])S.states['Fréquences Bi-Annuelles'][backendKey]=val;toast(val?'✅ Coché':'☐ Décoché');
+  S.checks['biannuel'][stateKey]=val;if(S.states['Fréquences Bi-Annuelles'])S.states['Fréquences Bi-Annuelles'][backendKey+'__'+monthIndex]=val;toast(val?'✅ Coché':'☐ Décoché');
   try{const r=await api('saveBiannuel',{itemName:backendKey,monthIndex,value:val});if(r&&!r.ok)toast('⚠️ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}
 }
 async function tickApp(appId,tempVal,day,slot,val){
+  DATA_REV++;
   if(!S.appChecks[appId])S.appChecks[appId]={};
   const ck=slot?`${tempVal}__${day}__${slot}`:`${tempVal}__${day}`;
   S.appChecks[appId][ck]=val;if(S.states['App_'+appId])S.states['App_'+appId][ck]=val;toast(val?'✅':'☐');
   try{const r=await api('saveAppareilTemp',{appareilId:appId,tempVal,day,slot,value:val});if(r&&!r.ok)toast('⚠️ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}
 }
 function togglePh(cb,inputId){const el=document.getElementById(inputId);if(!el)return;el.style.display=cb.checked?'':'none';if(!cb.checked)el.value='';}
-async function savePh(tabId,idx,day,val){const key='ph__i'+idx+'__'+day;if(!S.checks[tabId])S.checks[tabId]={};S.checks[tabId][key]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]]['ph__i'+idx]=val;try{await api('saveHebdo',{sheetName:SHEET_NAMES[tabId],itemName:'ph__i'+idx,day,value:val});}catch(e){toast('❌ '+e.message,true);}}
-async function saveComment(tabId){const el=document.getElementById('cmt-'+tabId);if(!el)return;S.comments[tabId]=el.value;const sn=tabId==='biannuel'?'Fréquences Bi-Annuelles':SHEET_NAMES[tabId];if(S.states[sn])S.states[sn]._comment=el.value;try{await api('saveComment',{sheetName:sn,comment:el.value});toast('💾 Commentaire enregistré');}catch(e){toast('❌ '+e.message,true);}}
-async function saveAppComment(appId){const el=document.getElementById('cmt-app-'+appId);if(!el)return;S.comments['app_'+appId]=el.value;if(S.states['App_'+appId])S.states['App_'+appId]._comment=el.value;try{await api('saveAppareilComment',{appareilId:appId,comment:el.value});toast('💾 Enregistré');}catch(e){toast('❌ '+e.message,true);}}
-async function saveAppMeta(appId){const m=document.getElementById('meta-m-'+appId)?.value||'',v=document.getElementById('meta-v-'+appId)?.value||'';S.meta[appId]={moisAnnee:m,visa:v};if(S.states['App_'+appId]){S.states['App_'+appId]._month=m;S.states['App_'+appId]._visa=v;}try{await api('saveAppareilMeta',{appareilId:appId,moisAnnee:m,visa:v});toast('💾 Méta enregistrée');}catch(e){toast('❌ '+e.message,true);}}
+async function savePh(tabId,idx,day,val){DATA_REV++;const key='ph__i'+idx+'__'+day;if(!S.checks[tabId])S.checks[tabId]={};S.checks[tabId][key]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][key]=val;try{await api('saveHebdo',{sheetName:SHEET_NAMES[tabId],itemName:'ph__i'+idx,day,value:val});}catch(e){toast('❌ '+e.message,true);}}
+async function saveComment(tabId){DATA_REV++;const el=document.getElementById('cmt-'+tabId);if(!el)return;S.comments[tabId]=el.value;const sn=tabId==='biannuel'?'Fréquences Bi-Annuelles':SHEET_NAMES[tabId];if(S.states[sn])S.states[sn]._comment=el.value;try{await api('saveComment',{sheetName:sn,comment:el.value});toast('💾 Commentaire enregistré');}catch(e){toast('❌ '+e.message,true);}}
+async function saveAppComment(appId){DATA_REV++;const el=document.getElementById('cmt-app-'+appId);if(!el)return;S.comments['app_'+appId]=el.value;if(S.states['App_'+appId])S.states['App_'+appId]._comment=el.value;try{await api('saveAppareilComment',{appareilId:appId,comment:el.value});toast('💾 Enregistré');}catch(e){toast('❌ '+e.message,true);}}
+async function saveAppMeta(appId){DATA_REV++;const m=document.getElementById('meta-m-'+appId)?.value||'',v=document.getElementById('meta-v-'+appId)?.value||'';S.meta[appId]={moisAnnee:m,visa:v};if(S.states['App_'+appId]){S.states['App_'+appId]._month=m;S.states['App_'+appId]._visa=v;}try{await api('saveAppareilMeta',{appareilId:appId,moisAnnee:m,visa:v});toast('💾 Méta enregistrée');}catch(e){toast('❌ '+e.message,true);}}
 async function ajouterAppareil(){const nom=document.getElementById('new-nom').value.trim(),type=document.getElementById('new-type').value;if(!nom){toast('⚠️ Entrez un nom',true);return;}try{const app=await api('addAppareil',{nom,type});S.appareils.push(app);document.getElementById('new-nom').value='';updateAppareilsTabs();renderTab('temp-manager');toast('✅ '+app.nom+' créé !');}catch(e){toast('❌ '+e.message,true);}}
 async function dupApp(id){try{const app=await api('dupliquerAppareil',{sourceId:id});S.appareils.push(app);updateAppareilsTabs();renderTab('temp-manager');toast('✅ Dupliqué : '+app.nom);}catch(e){toast('❌ '+e.message,true);}}
 function startRen(id){S.renaming[id]=true;renderTab('temp-manager');setTimeout(()=>document.getElementById('ren-'+id)?.focus(),50);}
