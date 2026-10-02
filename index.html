@@ -383,7 +383,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 @keyframes tcspin{to{transform:rotate(360deg)}}
 .hydrate-lock .cb-wrap,.hydrate-lock input,.hydrate-lock textarea,.hydrate-lock select,.hydrate-lock button{pointer-events:none!important;opacity:.6;}
 .loadbar{display:none;}
-#boot-screen{display:none;position:fixed;inset:0;z-index:90;background:linear-gradient(165deg,#0D4F5B 0%,#1B6B7B 55%,#14808F 100%);align-items:center;justify-content:center;padding:24px;}
+#boot-screen{display:none;position:fixed;inset:0;z-index:12000;background:linear-gradient(165deg,#0D4F5B 0%,#1B6B7B 55%,#14808F 100%);align-items:center;justify-content:center;padding:24px;}
 .boot-card{width:min(440px,100%);background:#fff;border-radius:20px;padding:32px 26px 26px;box-shadow:0 18px 50px rgba(0,0,0,.22);text-align:center;}
 .boot-card h2{margin:0;color:#0D4F5B;font-size:26px;}
 .boot-card .boot-sub{color:#607D8B;font-size:14px;margin:6px 0 22px;font-weight:600;}
@@ -700,6 +700,7 @@ async function doLogin() {
       // Persiste au refresh, effacé à la fermeture de l'onglet/navigateur
       sessionStorage.setItem('tc_api_url', API_URL);
       sessionStorage.setItem('tc_nom', data.nom || id || 'TempClean');
+      BOOT_LOGS = Array.isArray(data.logs) ? data.logs : null;
       // ⚡ Lance le bootstrap PENDANT la transition → 0 ms perdu
       startBootstrapPrefetch();
       enterApp(data.nom || id || 'TempClean');
@@ -738,6 +739,8 @@ function tryOpenFromMasterRedirect() {
 }
 
 function showApp(nomEntreprise) {
+  const gate = document.getElementById('boot-screen');
+  if (gate) gate.style.display = 'none';
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').classList.add('visible');
   document.getElementById('ss-name').textContent = nomEntreprise || '';
@@ -812,6 +815,7 @@ function logout() {
   // Reset état
   Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:''});
   elogRows = [];
+  BOOT_LOGS = null;
   // Reset bouton login
   const btn = document.getElementById('btn-login');
   btn.disabled = false; btn.classList.remove('loading');
@@ -1062,6 +1066,7 @@ function paintCurrentFromStates() {
 }
 let PRELOAD = null;
 let LOAD_TICK = null;
+let BOOT_LOGS = null;
 
 function setLoadProgress(pct, label) {
   const n = Math.max(0, Math.min(100, pct));
@@ -1074,6 +1079,31 @@ function setLoadProgress(pct, label) {
 }
 function hideLoadProgress() {
   if (LOAD_TICK) { clearInterval(LOAD_TICK); LOAD_TICK = null; }
+}
+function startCreep(from, to, label) {
+  const t0 = Date.now();
+  const dur = 50000;
+  setLoadProgress(from, label);
+  const id = setInterval(() => {
+    const p = from + (to - from) * Math.min(1, (Date.now() - t0) / dur);
+    setLoadProgress(p, label);
+  }, 400);
+  return { stop() { clearInterval(id); } };
+}
+function packReady() {
+  return ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer']
+    .every(t => S.loaded.has(t));
+}
+async function callWithRetry(run, tries) {
+  let last;
+  for (let i = 1; i <= tries; i++) {
+    try { return await run(); }
+    catch (e) {
+      last = e;
+      if (i < tries) await new Promise(r => setTimeout(r, 2000 * i));
+    }
+  }
+  throw last || new Error('échec');
 }
 function restorePackCache(cached) {
   if (!cached) return;
@@ -1142,102 +1172,106 @@ function finishPaint() {
     if (S.tab) renderTab(S.tab);
   } catch (e) {}
 }
+async function waitSnapshot(sid) {
+  const creep = startCreep(42, 74, 'Préparation des grilles…');
+  requestBuild();
+  try {
+    for (let i = 0; i < 40 && sid === SESSION_ID; i++) {
+      await new Promise(res => setTimeout(res, 3000));
+      let b = null;
+      try { b = await api('bootstrap', {}, { attempts: 1, timeout: 30000 }); } catch (e) { b = null; }
+      if (sid !== SESSION_ID) return false;
+      if (b && b.ok && !b.migrating) { applyPack(b); return true; }
+    }
+    return false;
+  } finally { creep.stop(); }
+}
+async function loadJournal() {
+  const logs = await masterApi('getLogs', { limit: 200 });
+  if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
+}
 async function preloadStepByStep(sid) {
   const steps = [
-    ['Laboratoire chaud', async () => {
-      const r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
-      if (r && r.migrating) requestBuild();
-      else if (r && r.ok) applyPack(r);
+    ['Grilles de température', 6, 36, async () => {
+      const r = await callWithRetry(() => api('bootstrap', {}, { attempts: 1, timeout: 50000 }), 3);
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'Grilles indisponibles');
+      if (r.migrating) {
+        applyPack(r);
+        if (!(await waitSnapshot(sid))) throw new Error('Préparation trop longue');
+      } else applyPack(r);
     }],
-    ['Prélèvements', async () => {
-      const r = await api('loadPrelevements', {}, { attempts: 1, timeout: 30000 });
-      applyPack({ prelevements: (r && r.rows) || [] });
+    ['Prélèvements', 36, 50, async () => {
+      const r = await callWithRetry(() => api('loadPrelevements', {}, { attempts: 1, timeout: 40000 }), 3);
+      if (!r || r.ok === false) throw new Error('Prélèvements');
+      applyPack({ prelevements: r.rows || [] });
     }],
-    ['Pesées', async () => {
-      const r = await api('loadPesees', {}, { attempts: 1, timeout: 30000 });
-      applyPack({ pesees: (r && r.rows) || [] });
+    ['Pesées', 50, 62, async () => {
+      const r = await callWithRetry(() => api('loadPesees', {}, { attempts: 1, timeout: 40000 }), 3);
+      if (!r || r.ok === false) throw new Error('Pesées');
+      applyPack({ pesees: r.rows || [] });
     }],
-    ['Machines', async () => {
-      const a = await api('loadMachines', {}, { attempts: 1, timeout: 30000 });
-      const b = await api('loadMaintenance', {}, { attempts: 1, timeout: 30000 });
-      applyPack({ machines: (a && a.rows) || [], maintenance: (b && b.rows) || [] });
+    ['Machines', 62, 76, async () => {
+      const a = await callWithRetry(() => api('loadMachines', {}, { attempts: 1, timeout: 40000 }), 3);
+      const b = await callWithRetry(() => api('loadMaintenance', {}, { attempts: 1, timeout: 40000 }), 3);
+      if (!a || a.ok === false || !b || b.ok === false) throw new Error('Machines');
+      applyPack({ machines: a.rows || [], maintenance: b.rows || [] });
     }],
-    ['Congélateur', async () => {
-      const r = await api('loadFreezerData', {}, { attempts: 1, timeout: 30000 });
-      applyPack({ freezerItems: (r && r.items) || [], freezerMeta: (r && r.meta) || {} });
-    }],
-    ['Journal', async () => {
-      const logs = await masterApi('getLogs', { limit: 200 });
-      if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
+    ['Congélateur', 76, 90, async () => {
+      const r = await callWithRetry(() => api('loadFreezerData', {}, { attempts: 1, timeout: 40000 }), 3);
+      if (!r || r.ok === false) throw new Error('Congélateur');
+      applyPack({ freezerItems: r.items || [], freezerMeta: r.meta || {} });
     }]
   ];
   for (let i = 0; i < steps.length; i++) {
-    if (sid !== SESSION_ID) return;
-    setLoadProgress(Math.round((i / steps.length) * 100), steps[i][0] + '…');
-    try { await steps[i][1](); } catch (e) {}
-    finishPaint();
+    if (sid !== SESSION_ID) return false;
+    const creep = startCreep(steps[i][1], steps[i][2] - 1, steps[i][0] + '…');
+    try { await steps[i][3](); }
+    catch (e) { return false; }
+    finally { creep.stop(); }
+    setLoadProgress(steps[i][2], steps[i][0]);
   }
-  setLoadProgress(100, 'Tous les modules sont prêts');
-  setTimeout(hideLoadProgress, 700);
+  if (sid !== SESSION_ID) return false;
+  const journal = startCreep(90, 98, 'Journal…');
+  try { await loadJournal(); } catch (e) {}
+  finally { journal.stop(); }
+  return packReady();
 }
 async function preloadAll() {
   if (PRELOAD) return PRELOAD;
   const sid = SESSION_ID;
   const job = (async () => {
-    let pct = 8;
-    setLoadProgress(pct, 'Connexion au dossier…');
-    const labels = ['Laboratoire chaud','Laboratoire froid','Autres zones','Bi-annuel','Appareils','Prélèvements','Pesées','Machines','Congélateur'];
-    LOAD_TICK = setInterval(() => {
-      if (pct < 62) {
-        pct += 1.5;
-        setLoadProgress(pct, labels[Math.min(labels.length - 1, Math.floor(pct / 7))] + '…');
-      }
-    }, 350);
-    const stopTick = () => { if (LOAD_TICK) { clearInterval(LOAD_TICK); LOAD_TICK = null; } };
+    const creep = startCreep(8, 92, 'Chargement des modules…');
     try {
-      let r = await api('loadPack', {}, { attempts: 1, timeout: 60000 });
+      const logsFromLogin = BOOT_LOGS;
+      BOOT_LOGS = null;
+      const packP = api('loadPack', {}, { attempts: 1, timeout: 45000 }).then(function(v) { return v; }).catch(function() { return null; });
+      const logP = logsFromLogin ? Promise.resolve({ ok: true, rows: logsFromLogin }) : masterApi('getLogs', { limit: 200 });
+      let both = await Promise.all([packP, logP]);
+      let r = both[0];
+      const logs = both[1];
+      creep.stop();
       if (sid !== SESSION_ID) return false;
-      const unknown = r && r.ok === false && String(r.error || '').indexOf('inconnue') !== -1;
-      if (unknown) { stopTick(); await preloadStepByStep(sid); return sid === SESSION_ID; }
-      if (!r || !r.ok) throw new Error((r && r.error) || 'Chargement impossible');
-      stopTick();
+      const unknown = !!(r && r.ok === false && String(r.error || '').indexOf('inconnue') !== -1);
+      if (unknown) {
+        const stepped = await preloadStepByStep(sid);
+        if (!stepped || sid !== SESSION_ID) return false;
+        setLoadProgress(100, 'Tous les modules sont prêts');
+        return true;
+      }
+      if (!r || !r.ok) {
+        r = await api('loadPack', {}, { attempts: 1, timeout: 45000 }).catch(function() { return null; });
+      }
+      if (sid !== SESSION_ID || !r || !r.ok) return false;
       if (r.migrating) {
         applyPack(r);
-        setLoadProgress(38, 'Préparation des grilles…');
-        requestBuild();
-        let ready = false;
-        for (let i = 0; i < 40 && sid === SESSION_ID; i++) {
-          await new Promise(res => setTimeout(res, 3000));
-          const b = await api('bootstrap', {}, { attempts: 1, timeout: 20000 });
-          if (sid !== SESSION_ID) return false;
-          setLoadProgress(38 + Math.min(28, i * 2), 'Préparation des grilles…');
-          if (b && b.ok && !b.migrating) { applyPack(b); ready = true; break; }
-        }
-        if (!ready) return false;
+        if (!(await waitSnapshot(sid))) return false;
       } else applyPack(r);
-      setLoadProgress(92, 'Journal…');
-      try {
-        const logs = await masterApi('getLogs', { limit: 200 });
-        if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
-      } catch (e) {}
-      if (sid !== SESSION_ID) return false;
+      if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
+      if (sid !== SESSION_ID || !packReady()) return false;
       setLoadProgress(100, 'Tous les modules sont prêts');
       return true;
-    } catch (e) {
-      stopTick();
-      if (sid !== SESSION_ID) return false;
-      setLoadProgress(Math.max(pct, 40), 'Nouvel essai…');
-      try {
-        await new Promise(res => setTimeout(res, 1500));
-        if (sid !== SESSION_ID) return false;
-        const again = await api('loadPack', {}, { attempts: 1, timeout: 60000 });
-        if (again && again.ok && !again.migrating) {
-          applyPack(again);
-          setLoadProgress(100, 'Tous les modules sont prêts');
-          return true;
-        }
-      } catch (e2) {}
-      return false;
+    } finally {
+      creep.stop();
     }
   })();
   PRELOAD = job;
