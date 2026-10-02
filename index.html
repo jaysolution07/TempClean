@@ -382,6 +382,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .hydrate-banner .mini-spin{width:13px;height:13px;border:2px solid rgba(0,105,92,.25);border-top-color:#00695C;border-radius:50%;display:inline-block;animation:tcspin .7s linear infinite;flex:none;}
 @keyframes tcspin{to{transform:rotate(360deg)}}
 .hydrate-lock .cb-wrap,.hydrate-lock input,.hydrate-lock textarea,.hydrate-lock select,.hydrate-lock button{pointer-events:none!important;opacity:.6;}
+.loadbar{display:none;}
+#boot-screen{display:none;position:fixed;inset:0;z-index:90;background:linear-gradient(165deg,#0D4F5B 0%,#1B6B7B 55%,#14808F 100%);align-items:center;justify-content:center;padding:24px;}
+.boot-card{width:min(440px,100%);background:#fff;border-radius:20px;padding:32px 26px 26px;box-shadow:0 18px 50px rgba(0,0,0,.22);text-align:center;}
+.boot-card h2{margin:0;color:#0D4F5B;font-size:26px;}
+.boot-card .boot-sub{color:#607D8B;font-size:14px;margin:6px 0 22px;font-weight:600;}
+.boot-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;color:#00695C;}
+.boot-track{height:12px;background:#E0F2F1;border-radius:99px;overflow:hidden;margin-top:10px;}
+#boot-fill{height:100%;width:0;background:linear-gradient(90deg,#00796B,#26C6DA);transition:width .35s ease;}
+#boot-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -448,6 +457,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
       </button>
     </div>
     <div class="login-footer">Propulsé par <strong>TempClean</strong> v2.0 &nbsp;•&nbsp; 2026</div>
+  </div>
+</div>
+
+<div id="boot-screen">
+  <div class="boot-card">
+    <h2>🧹 TempClean</h2>
+    <div class="boot-sub" id="boot-name">Chargement des modules</div>
+    <div class="boot-row"><span id="boot-label">Connexion…</span><span id="boot-pct">0%</span></div>
+    <div class="boot-track"><div id="boot-fill"></div></div>
   </div>
 </div>
 
@@ -684,7 +702,7 @@ async function doLogin() {
       sessionStorage.setItem('tc_nom', data.nom || id || 'TempClean');
       // ⚡ Lance le bootstrap PENDANT la transition → 0 ms perdu
       startBootstrapPrefetch();
-      showApp(data.nom || id || 'TempClean');
+      enterApp(data.nom || id || 'TempClean');
     } else {
       loginAttempts++;
       updateDots();
@@ -714,8 +732,8 @@ function tryOpenFromMasterRedirect() {
     const cleanUrl = window.location.origin + window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
   } catch (e) {}
-  startBootstrapPrefetch(); // ⚡ réveille l'app pendant la redirection
-  showApp(nom);
+  startBootstrapPrefetch();
+  enterApp(nom);
   return true;
 }
 
@@ -740,7 +758,35 @@ function showApp(nomEntreprise) {
   }
 
   initApp();
-  startKeepalive(); // garde le script Google éveillé pendant l'utilisation
+  startKeepalive();
+}
+
+let ENTERING = false;
+async function enterApp(nom) {
+  if (ENTERING) return;
+  ENTERING = true;
+  try {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').classList.remove('visible');
+    const gate = document.getElementById('boot-screen');
+    if (gate) gate.style.display = 'flex';
+    const nameEl = document.getElementById('boot-name');
+    if (nameEl) nameEl.textContent = nom || 'Chargement des modules';
+    const ok = await preloadAll();
+    if (!ok) {
+      const lab = document.getElementById('boot-label');
+      if (lab) lab.innerHTML = 'Chargement incomplet — <button class="btn btn-sm" style="margin-left:8px" onclick="retryBoot()">Réessayer</button>';
+      return;
+    }
+    if (gate) gate.style.display = 'none';
+    showApp(nom);
+  } finally {
+    ENTERING = false;
+  }
+}
+function retryBoot() {
+  PRELOAD = null;
+  enterApp(sessionStorage.getItem('tc_nom') || document.getElementById('boot-name').textContent || '');
 }
 
 function logout() {
@@ -750,6 +796,7 @@ function logout() {
   if (KEEPALIVE_TIMER) { clearInterval(KEEPALIVE_TIMER); KEEPALIVE_TIMER = null; }
   SESSION_ID++;
   DATA_REV = 0;
+  hideLoadProgress();
   BG_REFRESH = null;
   Object.keys(stateFetchers).forEach(k => delete stateFetchers[k]);
   Object.keys(recFetchers).forEach(k => delete recFetchers[k]);
@@ -759,6 +806,8 @@ function logout() {
   sessionStorage.removeItem('tc_api_url');
   sessionStorage.removeItem('tc_nom');
   document.getElementById('app-screen').classList.remove('visible');
+  const gate = document.getElementById('boot-screen');
+  if (gate) gate.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   // Reset état
   Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:''});
@@ -785,8 +834,7 @@ window.onload = () => {
   const savedNom = sessionStorage.getItem('tc_nom');
   if (savedUrl) {
     API_URL = savedUrl;
-    startBootstrapPrefetch(); // ⚡ réveille Google pendant l'affichage du cache
-    showApp(savedNom || '');
+    enterApp(savedNom || '');
   } else {
     document.getElementById('inp-id').focus();
   }
@@ -837,7 +885,7 @@ async function api(action, params = {}, opts = {}) {
 // d'attente, et chaque retry relançait une exécution Apps Script.
 const API_TIMEOUT_MS = 25000;
 let API_SLOTS = 0;
-const API_SLOT_MAX = 2;
+const API_SLOT_MAX = 4;
 const API_WAITERS = [];
 function acquireApiSlot() {
   if (API_SLOTS < API_SLOT_MAX) { API_SLOTS++; return Promise.resolve(); }
@@ -937,11 +985,267 @@ let SESSION_ID = 0; // incrémenté à chaque connexion/déconnexion (annule les
 let DATA_REV = 0;   // > 0 si l'utilisateur a modifié l'onglet affiché pendant un refresh
 
 function startBootstrapPrefetch() {
-  if (DEMO_MODE || !API_URL || PREFETCH) return;
-  // UNE requête pour tous les modules. Le filtre "1 feuille" relançait une
-  // lecture complète de _DATA par onglet et saturait Apps Script.
-  PREFETCH = api('bootstrap', {}, { attempts: 1, timeout: 45000 }).catch(() => null);
+  if (DEMO_MODE || !API_URL) return;
+  preloadAll();
 }
+
+let BOOT_PROMISE = null;
+let BUILD_PROMISE = null;
+let SYNC_RUNNING = false;
+let SYNC_GEN = 0;
+
+function requestBootstrap() {
+  if (BOOT_PROMISE) return BOOT_PROMISE;
+  const p = api('bootstrap', {}, { attempts: 1, timeout: 25000 })
+    .finally(() => { if (BOOT_PROMISE === p) BOOT_PROMISE = null; });
+  BOOT_PROMISE = p;
+  return p;
+}
+function requestBuild() {
+  if (BUILD_PROMISE) return BUILD_PROMISE;
+  const p = api('buildSnapshot', {}, { attempts: 1, timeout: 120000 })
+    .catch(() => null)
+    .finally(() => { if (BUILD_PROMISE === p) BUILD_PROMISE = null; });
+  BUILD_PROMISE = p;
+  return p;
+}
+function currentStateMissing() {
+  const key = pendingStateTab(S.tab);
+  return !!(key && S.states[key] === undefined);
+}
+function setSyncBanner(msg, isErr) {
+  const c = document.getElementById('main-content');
+  if (!c) return;
+  c.classList.remove('hydrate-lock');
+  let banner = document.getElementById('sync-banner');
+  if (!msg) { if (banner) banner.remove(); return; }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'sync-banner';
+    banner.className = 'hydrate-banner';
+    c.insertBefore(banner, c.firstChild);
+  }
+  banner.classList.toggle('hydrate-err', !!isErr);
+  banner.innerHTML = msg;
+}
+function sealKnownStates() {
+  Object.keys(SHEET_NAMES).forEach(t => {
+    const k = SHEET_NAMES[t];
+    if (S.states[k] === undefined) S.states[k] = {};
+  });
+  if (S.states['Fréquences Bi-Annuelles'] === undefined) S.states['Fréquences Bi-Annuelles'] = {};
+  (S.appareils || []).forEach(a => {
+    if (a && a.id && S.states['App_' + a.id] === undefined) S.states['App_' + a.id] = {};
+  });
+}
+function absorbBootstrap(r) {
+  if (!r || !r.ok || r.migrating) return false;
+  if (r.appareils) S.appareils = r.appareils;
+  if (r.states) S.states = r.states;
+  sealKnownStates();
+  Object.keys(SHEET_NAMES).forEach(tab => {
+    const st = S.states[SHEET_NAMES[tab]];
+    if (st && st._comment) S.comments[tab] = st._comment;
+  });
+  updateAppareilsTabs();
+  saveCache({ ok: true, appareils: S.appareils || [], states: S.states || {} });
+  return true;
+}
+function paintCurrentFromStates() {
+  const key = pendingStateTab(S.tab);
+  if (!key) return;
+  const typing = document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  if (typing) return;
+  applyTabState(S.tab, key, S.states[key] || {});
+  S.loaded.add(S.tab);
+  renderTab(S.tab);
+}
+let PRELOAD = null;
+let LOAD_TICK = null;
+
+function setLoadProgress(pct, label) {
+  const n = Math.max(0, Math.min(100, pct));
+  const fill = document.getElementById('boot-fill');
+  const lab = document.getElementById('boot-label');
+  const num = document.getElementById('boot-pct');
+  if (fill) fill.style.width = n + '%';
+  if (num) num.textContent = Math.round(n) + '%';
+  if (lab && label) lab.textContent = label;
+}
+function hideLoadProgress() {
+  if (LOAD_TICK) { clearInterval(LOAD_TICK); LOAD_TICK = null; }
+}
+function restorePackCache(cached) {
+  if (!cached) return;
+  if (Array.isArray(cached.prelevements)) { S.prelevements = cached.prelevements; S.loaded.add('prelevements'); }
+  if (Array.isArray(cached.pesees)) { S.pesees = cached.pesees; S.loaded.add('pesees'); }
+  if (Array.isArray(cached.machines)) { S.machines = cached.machines; }
+  if (Array.isArray(cached.maintenance)) { S.maintenanceRows = cached.maintenance; S.loaded.add('maintenance'); }
+  if (!S.maintenanceMachineId && S.machines.length) S.maintenanceMachineId = S.machines[0].id;
+  if (Array.isArray(cached.freezerItems)) {
+    S.freezerItems = cached.freezerItems;
+    S.freezerMeta = Object.assign({dateDebut:'',dateFin:'',filtreRack:''}, cached.freezerMeta || {});
+    S.loaded.add('freezer');
+  }
+}
+function rememberPack() {
+  saveCache({
+    ok: true,
+    appareils: S.appareils || [],
+    states: S.states || {},
+    prelevements: S.prelevements || [],
+    pesees: S.pesees || [],
+    machines: S.machines || [],
+    maintenance: S.maintenanceRows || [],
+    freezerItems: S.freezerItems || [],
+    freezerMeta: S.freezerMeta || {}
+  });
+}
+function applyPack(r) {
+  if (!r) return;
+  if (r.appareils) S.appareils = r.appareils;
+  if (r.states && !r.migrating) {
+    S.states = r.states;
+    sealKnownStates();
+    ['chaud','froid','autres'].forEach(t => applyState(t, S.states[SHEET_NAMES[t]] || {}));
+    applyState('biannuel', S.states['Fréquences Bi-Annuelles'] || {});
+    (S.appareils || []).forEach(a => {
+      S.appChecks[a.id] = {};
+      Object.entries(S.states['App_' + a.id] || {}).forEach(([k, v]) => {
+        S.appChecks[a.id][k] = (v === true || v === 'TRUE');
+      });
+      if (a.actif) S.loaded.add('app_' + a.id);
+    });
+    ['chaud','froid','autres','biannuel'].forEach(t => S.loaded.add(t));
+  }
+  if (r.appareils) updateAppareilsTabs();
+  if (Array.isArray(r.prelevements)) { S.prelevements = r.prelevements; S.loaded.add('prelevements'); }
+  if (Array.isArray(r.pesees)) { S.pesees = r.pesees; S.loaded.add('pesees'); }
+  if (Array.isArray(r.machines)) {
+    S.machines = r.machines;
+    S.maintenanceRows = r.maintenance || [];
+    if (!S.maintenanceMachineId && S.machines.length) S.maintenanceMachineId = S.machines[0].id;
+    S.loaded.add('maintenance');
+  }
+  if (Array.isArray(r.freezerItems)) {
+    S.freezerItems = r.freezerItems.map(it => normalizeFreezerItem(it));
+    S.freezerMeta = Object.assign({dateDebut:'',dateFin:'',filtreRack:''}, r.freezerMeta || {});
+    S.loaded.add('freezer');
+  }
+  rememberPack();
+}
+function finishPaint() {
+  try {
+    const typing = document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (typing) return;
+    if (S.tab === 'elog') { renderElog(elogRows || []); return; }
+    if (S.tab) renderTab(S.tab);
+  } catch (e) {}
+}
+async function preloadStepByStep(sid) {
+  const steps = [
+    ['Laboratoire chaud', async () => {
+      const r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
+      if (r && r.migrating) requestBuild();
+      else if (r && r.ok) applyPack(r);
+    }],
+    ['Prélèvements', async () => {
+      const r = await api('loadPrelevements', {}, { attempts: 1, timeout: 30000 });
+      applyPack({ prelevements: (r && r.rows) || [] });
+    }],
+    ['Pesées', async () => {
+      const r = await api('loadPesees', {}, { attempts: 1, timeout: 30000 });
+      applyPack({ pesees: (r && r.rows) || [] });
+    }],
+    ['Machines', async () => {
+      const a = await api('loadMachines', {}, { attempts: 1, timeout: 30000 });
+      const b = await api('loadMaintenance', {}, { attempts: 1, timeout: 30000 });
+      applyPack({ machines: (a && a.rows) || [], maintenance: (b && b.rows) || [] });
+    }],
+    ['Congélateur', async () => {
+      const r = await api('loadFreezerData', {}, { attempts: 1, timeout: 30000 });
+      applyPack({ freezerItems: (r && r.items) || [], freezerMeta: (r && r.meta) || {} });
+    }],
+    ['Journal', async () => {
+      const logs = await masterApi('getLogs', { limit: 200 });
+      if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
+    }]
+  ];
+  for (let i = 0; i < steps.length; i++) {
+    if (sid !== SESSION_ID) return;
+    setLoadProgress(Math.round((i / steps.length) * 100), steps[i][0] + '…');
+    try { await steps[i][1](); } catch (e) {}
+    finishPaint();
+  }
+  setLoadProgress(100, 'Tous les modules sont prêts');
+  setTimeout(hideLoadProgress, 700);
+}
+async function preloadAll() {
+  if (PRELOAD) return PRELOAD;
+  const sid = SESSION_ID;
+  const job = (async () => {
+    let pct = 8;
+    setLoadProgress(pct, 'Connexion au dossier…');
+    const labels = ['Laboratoire chaud','Laboratoire froid','Autres zones','Bi-annuel','Appareils','Prélèvements','Pesées','Machines','Congélateur'];
+    LOAD_TICK = setInterval(() => {
+      if (pct < 62) {
+        pct += 1.5;
+        setLoadProgress(pct, labels[Math.min(labels.length - 1, Math.floor(pct / 7))] + '…');
+      }
+    }, 350);
+    const stopTick = () => { if (LOAD_TICK) { clearInterval(LOAD_TICK); LOAD_TICK = null; } };
+    try {
+      let r = await api('loadPack', {}, { attempts: 1, timeout: 60000 });
+      if (sid !== SESSION_ID) return false;
+      const unknown = r && r.ok === false && String(r.error || '').indexOf('inconnue') !== -1;
+      if (unknown) { stopTick(); await preloadStepByStep(sid); return sid === SESSION_ID; }
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Chargement impossible');
+      stopTick();
+      if (r.migrating) {
+        applyPack(r);
+        setLoadProgress(38, 'Préparation des grilles…');
+        requestBuild();
+        let ready = false;
+        for (let i = 0; i < 40 && sid === SESSION_ID; i++) {
+          await new Promise(res => setTimeout(res, 3000));
+          const b = await api('bootstrap', {}, { attempts: 1, timeout: 20000 });
+          if (sid !== SESSION_ID) return false;
+          setLoadProgress(38 + Math.min(28, i * 2), 'Préparation des grilles…');
+          if (b && b.ok && !b.migrating) { applyPack(b); ready = true; break; }
+        }
+        if (!ready) return false;
+      } else applyPack(r);
+      setLoadProgress(92, 'Journal…');
+      try {
+        const logs = await masterApi('getLogs', { limit: 200 });
+        if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
+      } catch (e) {}
+      if (sid !== SESSION_ID) return false;
+      setLoadProgress(100, 'Tous les modules sont prêts');
+      return true;
+    } catch (e) {
+      stopTick();
+      if (sid !== SESSION_ID) return false;
+      setLoadProgress(Math.max(pct, 40), 'Nouvel essai…');
+      try {
+        await new Promise(res => setTimeout(res, 1500));
+        if (sid !== SESSION_ID) return false;
+        const again = await api('loadPack', {}, { attempts: 1, timeout: 60000 });
+        if (again && again.ok && !again.migrating) {
+          applyPack(again);
+          setLoadProgress(100, 'Tous les modules sont prêts');
+          return true;
+        }
+      } catch (e2) {}
+      return false;
+    }
+  })();
+  PRELOAD = job;
+  job.finally(() => { if (PRELOAD === job) PRELOAD = null; });
+  return job;
+}
+function runSyncLoop() { return preloadAll(); }
+function retrySync() { preloadAll(); }
 
 // ════════════════════════════════════════════════════════════════════
 //  CHARGEMENT OPTIMISTE DES ONGLETS — plus JAMAIS d'attente bloquante.
@@ -969,27 +1273,9 @@ function tabForStateKey(key) {
 
 // 1 seule requête en vol par feuille : le clic d'un onglet et le pré-chargement
 // d'arrière-plan partagent la même promesse (jamais 2 appels identiques).
-function ensureStateFetched(tab, key, force) {
-  if (!force && S.states[key] !== undefined) return Promise.resolve(S.states[key]);
-  if (stateFetchers[key]) return stateFetchers[key];
-  const p = (async () => {
-    let raw;
-    if (BOOTSTRAP_OK) {
-      const r = await api('bootstrap', { state: key }, { attempts: 1, timeout: 30000 });
-      if (r && r.ok) raw = (r.states && r.states[key]) || {};
-    }
-    if (raw === undefined) {
-      // Ancien backend (sans bootstrap/light) ou feuille encore vide → action dédiée
-      raw = (tab === 'biannuel') ? await api('loadBiannuelState')
-          : (tab.startsWith('app_') ? await api('loadAppareilState', { appareilId: tab.slice(4) })
-          : await api('loadHebdoState', { sheetName: key }));
-    }
-    raw = raw || {};
-    S.states[key] = raw;
-    return raw;
-  })().finally(() => { delete stateFetchers[key]; });
-  stateFetchers[key] = p;
-  return p;
+function ensureStateFetched(tab, key) {
+  if (S.states[key] !== undefined) return Promise.resolve(S.states[key]);
+  return runSyncLoop().then(() => S.states[key] || {});
 }
 
 // Rejoue l'état d'une feuille dans les structures d'affichage (cases/méta/commentaires)
@@ -1005,86 +1291,30 @@ function applyTabState(tab, key, raw) {
 }
 
 // Ouvre un onglet d'état : affichage immédiat + synchronisation en arrière-plan
-async function openStateTab(tab) {
+function openStateTab(tab) {
   const key = pendingStateTab(tab);
-  // Déjà affiché → rien à recharger (S.checks reste la vérité d'écran)
   if (S.loaded.has(tab)) { renderTab(tab); return; }
-  // Feuille déjà synchronisée (cache local / prefetch) → rejouée et affichée SANS réseau
-  if (!key || S.states[key] !== undefined) {
-    if (key) applyTabState(tab, key, S.states[key]);
+  if (key && S.states[key] !== undefined) {
+    applyTabState(tab, key, S.states[key]);
     S.loaded.add(tab);
     renderTab(tab);
     return;
   }
-  // Première visite : on dessine la grille IMMÉDIATEMENT (structure connue)…
   renderTab(tab);
-  const c = document.getElementById('main-content');
-  const banner = document.createElement('div');
-  banner.className = 'hydrate-banner';
-  banner.innerHTML = '<span class="mini-spin"></span> Synchronisation des données…';
-  c.classList.add('hydrate-lock');
-  c.insertBefore(banner, c.firstChild);
-  // …puis la feuille arrive en arrière-plan (petite requête, jamais bloquante)
-  try {
-    const raw = await ensureStateFetched(tab, key, false);
-    applyTabState(tab, key, raw);
-  } catch (e) {
-    c.classList.remove('hydrate-lock');
-    banner.classList.add('hydrate-err');
-    banner.innerHTML = '⚠️ Données non synchronisées — <button class="btn btn-sm" onclick="retryOpenTab(\'' + tab + '\')">🔄 Réessayer</button>';
-    return;
-  }
-  if (S.tab !== tab) return; // parti ailleurs : le prochain clic relira le cache frais
-  S.loaded.add(tab);
-  renderTab(tab); // re-dessin avec les vraies valeurs (enlève le bandeau + le verrou)
+  runSyncLoop();
 }
 
-function retryOpenTab(tab) { loadAndRender(tab); }
+function retryOpenTab(tab) { retrySync(); }
 
 // Un seul rafraîchissement en arrière-plan (quand l'écran vient du cache).
 // Plus de 3 workers × N feuilles : ça remplissait la file Apps Script et les
 // modules restaient blancs plusieurs minutes.
 function mergeFreshBootstrap(r) {
-  if (!r || !r.ok) return;
-  const keepKey = pendingStateTab(S.tab);
-  const keepLocal = (DATA_REV > 0 && keepKey && S.states[keepKey]) ? S.states[keepKey] : null;
-  if (r.states) S.states = r.states;
-  if (keepLocal && keepKey) S.states[keepKey] = keepLocal;
-  if (r.appareils) S.appareils = r.appareils;
-  Object.keys(SHEET_NAMES).forEach(tab => {
-    const st = S.states[SHEET_NAMES[tab]];
-    if (st && st._comment) S.comments[tab] = st._comment;
-  });
-  updateAppareilsTabs();
-  saveCache({ ok: true, appareils: S.appareils || [], states: S.states || {} });
-  const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-  if (!typing && !keepLocal && keepKey) {
-    applyTabState(S.tab, keepKey, S.states[keepKey] || {});
-    S.loaded.add(S.tab);
-    renderTab(S.tab);
-  }
-  S.loaded.forEach(t => {
-    if (t !== S.tab && (SHEET_NAMES[t] || t === 'biannuel' || t.startsWith('app_'))) S.loaded.delete(t);
-  });
-  connRetryCount = 0;
+  if (!absorbBootstrap(r)) return;
+  paintCurrentFromStates();
 }
 
-function scheduleBgRefresh(pending) {
-  if (BG_REFRESH) return BG_REFRESH;
-  const sid = SESSION_ID;
-  const p = (async () => {
-    try {
-      let r = pending ? await pending : null;
-      if (sid !== SESSION_ID) return;
-      if (!r || !r.ok) r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
-      if (sid !== SESSION_ID) return;
-      mergeFreshBootstrap(r);
-    } catch (e) { /* rafraîchissement silencieux */ }
-  })();
-  p.finally(() => { if (BG_REFRESH === p) BG_REFRESH = null; });
-  BG_REFRESH = p;
-  return p;
-}
+function scheduleBgRefresh() { return runSyncLoop(); }
 
 // Garde le script Apps Script éveillé pendant qu'un utilisateur travaille
 // (1 ping toutes les 4 min → plus de cold start de 10-30 s en plein milieu).
@@ -1328,6 +1558,20 @@ async function demoApi(action, params={}){
       const only = params.state;
       return { ok:true, appareils:deepClone(DEMO_STORE.appareils), states: only ? (states[only] ? { [only]: states[only] } : {}) : states };
     }
+    case 'loadPack': {
+      const boot = await demoApi('bootstrap', {});
+      return {
+        ok:true,
+        appareils: boot.appareils,
+        states: boot.states,
+        prelevements: deepClone(DEMO_STORE.prelevements || []),
+        pesees: deepClone(DEMO_STORE.pesees || []),
+        machines: deepClone(DEMO_STORE.machines || []),
+        maintenance: deepClone(DEMO_STORE.maintenanceRows || []),
+        freezerItems: deepClone(DEMO_STORE.freezerItems || []),
+        freezerMeta: deepClone(DEMO_STORE.freezerMeta || {})
+      };
+    }
     case 'getAppData': return { appareils:deepClone(DEMO_STORE.appareils), comments:deepClone(DEMO_STORE.comments), meta:deepClone(DEMO_STORE.appMeta) };
     case 'loadHebdoState': return deepClone(DEMO_STORE.hebdo[params.sheetName] || {});
     case 'loadBiannuelState': return deepClone(DEMO_STORE.biannuel);
@@ -1504,7 +1748,7 @@ function startDemoSession(){
   const btn = document.getElementById('btn-logout');
   if (btn) btn.style.display = 'none';
   document.getElementById('login-screen').style.display = 'none';
-  showApp(DEMO_COMPANY_NAME);
+  enterApp(DEMO_COMPANY_NAME);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1541,56 +1785,18 @@ function applyBootstrap(r, opts = {}) {
 function refreshInBackground() { scheduleBgRefresh(); }
 
 async function initApp() {
-  const c = document.getElementById('main-content');
-  const cached = loadCache();
-  if (cached && cached.ok) {
-    applyBootstrap(cached);
-    const pending = PREFETCH;
-    PREFETCH = null;
-    scheduleBgRefresh(pending);
-    return;
-  }
-  if (!paintArrivalShell()) {
-    c.innerHTML = '<div class="loading"><div class="spinner"></div><span id="api-status">Connexion...</span></div>';
-  }
-  try {
-    let r = null;
-    if (PREFETCH) { r = await PREFETCH; PREFETCH = null; }
-    if (!r || !r.ok) {
-      const late = loadCache();
-      if (late && late.ok) {
-        applyBootstrap(late);
-        scheduleBgRefresh(null);
-        return;
-      }
-      if (!r) r = await api('bootstrap', {}, { attempts: 1, timeout: 45000 });
-    }
-    if (r && !r.ok && String(r.error || '').indexOf('bootstrap') !== -1) {
-      BOOTSTRAP_OK = false;
-      r = await api('ping');
-      if (r.ok) {
-        const d = await api('getAppData');
-        r = { ok: true, appareils: d.appareils || [], states: {} };
-      }
-    }
-    if (!r || !r.ok) { showConnError((r && r.error) || 'Réponse vide'); return; }
-    connRetryCount = 0;
-    if (BOOTSTRAP_OK && r.states) saveCache(r);
-    applyBootstrap(r);
-  } catch(e) { showConnError(e.message); }
-}
-
-function paintArrivalShell() {
   const tab = INIT_TAB || 'chaud';
-  if (!pendingStateTab(tab) || String(tab).indexOf('app_') === 0) return false;
   S.tab = tab;
-  renderTab(tab);
-  const c = document.getElementById('main-content');
-  const banner = document.createElement('div');
-  banner.className = 'hydrate-banner';
-  banner.innerHTML = '<span class="mini-spin"></span> Connexion…';
-  if (c) c.insertBefore(banner, c.firstChild);
-  return true;
+  document.querySelectorAll('#tabs-bar .tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === tab));
+  document.querySelectorAll('.sidebar-item').forEach(i => {
+    const id = i.getAttribute('data-tab');
+    if (id) i.classList.toggle('active', id === tab);
+  });
+  if (tab === 'elog') renderElog(elogRows || []);
+  else if (pendingStateTab(tab)) openStateTab(tab);
+  else renderTab(tab);
+  const st = document.getElementById('conn-status');
+  if (st) { st.textContent = '✅'; st.style.background = 'rgba(76,175,80,.4)'; }
 }
 
 let connRetryTimer = null;
@@ -1686,27 +1892,18 @@ function switchTab(tab, el) {
     const t = i.getAttribute('data-tab') || (i.getAttribute('data-app-id') ? 'app_'+i.getAttribute('data-app-id') : null);
     i.classList.toggle('active', t===tab);
   });
-  if (tab==='elog') { elogRows=[]; loadElog(); return; }
+  if (tab==='elog') { renderElog(elogRows || []); return; }
   if (tab==='temp-manager') { renderTab(tab); return; }
-  if (S.loaded.has(tab)) { renderTab(tab); return; }
-  loadAndRender(tab);
+  if (pendingStateTab(tab)) { openStateTab(tab); return; }
+  renderTab(tab);
 }
 
 async function loadAndRender(tab) {
-  // Les onglets d'état (grilles) s'affichent TOUJOURS immédiatement : leur structure
-  // est connue côté client → dessin tout de suite (données déjà en cache), puis la
-  // feuille se synchronise en arrière-plan. Plus jamais de roue qui tourne 20 s.
-  if (pendingStateTab(tab)) return openStateTab(tab);
-  // Onglets "enregistrements" (prélèvements, pesées, machines, congélateur) :
-  // contenu 100 % serveur → chargement avec indicateur, partagé avec la pré-charge.
-  const c = document.getElementById('main-content');
-  c.innerHTML = '<div class="loading"><div class="spinner"></div><span id="api-status">Chargement...</span></div>';
-  try {
-    await ensureRecordsFetched(tab);
-  } catch(e) { toast('⚠️ Chargement partiel: '+e.message,true); }
-  if (S.tab !== tab) return; // l'utilisateur est parti entre-temps
-  S.loaded.add(tab);
+  if (pendingStateTab(tab)) { openStateTab(tab); return; }
   renderTab(tab);
+  if (!S.loaded.has(tab) && PRELOAD) {
+    PRELOAD.then(() => { if (S.tab === tab) finishPaint(); }).catch(() => {});
+  }
 }
 
 // Prépare les données d'un onglet enregistrements (une seule requête en vol par
