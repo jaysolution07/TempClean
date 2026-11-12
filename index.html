@@ -1674,7 +1674,8 @@ function normalizeLayout(raw){
     const declared = Number(src.nextSlot);
     out.tabs[tabId] = { sections: sections, nextSlot: Math.max(isFinite(declared) ? declared : 0, maxSlot + 1) };
   });
-  if (!LAYOUT_TABS.every(t => out.tabs[t])) return null;
+  // Un module absent de la config serveur reste vide (au lieu d'annuler toute la config).
+  LAYOUT_TABS.forEach(t => { if (!out.tabs[t]) out.tabs[t] = { sections: [], nextSlot: 0 }; });
   return out;
 }
 
@@ -1720,22 +1721,30 @@ async function syncLayoutFromServer(){
   if (!API_URL || DEMO_MODE) return;
   try {
     const r = await api('loadLayout');
-    if (!r || r.ok === false) return;
-    const remote = normalizeLayout({ tabs: r.tabs, types: r.types, labels: r.labels, updated: r.updated });
-    if (!remote) return;
+    if (!r || r.ok === false) return; // backend sans loadLayout : on garde la config locale
+    const remote = (r.tabs && Object.keys(r.tabs).length)
+      ? normalizeLayout({ tabs: r.tabs, types: r.types, labels: r.labels, updated: r.updated })
+      : null;
+    // Le serveur fait foi dès qu'il répond : il n'y a PLUS de renvoi de la config
+    // locale vers le serveur au démarrage (c'est ce qui faisait réapparaître les
+    // zones d'un autre client après un effacement).
     const local = initLayout();
-    // Une config serveur existe dès qu'elle contient des zones : on la reprend même
-    // si son horodatage est vide (anciennes versions), pour ne jamais la perdre.
-    const remoteHasZones = LAYOUT_TABS.some(t => ((remote.tabs[t] || {}).sections || []).length);
-    if (remote.updated > (Number(local.updated) || 0) || (remoteHasZones && !Number(local.updated))) {
-      remote.updated = Number(remote.updated) || 0;
-      LAYOUT = remote;
-      saveLayoutLocal();
-      applyModuleLabels();
-      refreshLayoutViews();
-    } else if ((Number(local.updated) || 0) > remote.updated) {
-      api('saveLayout', { tabs: local.tabs, types: local.types, labels: local.labels, updated: local.updated }).catch(() => {});
+    if (!remote) {
+      const hasZones = LAYOUT_TABS.some(t => ((local.tabs[t] || {}).sections || []).length);
+      if (hasZones || Number(local.updated)) {
+        const blank = buildEmptyLayout();
+        blank.types = local.types || blank.types;   // on garde les noms de types choisis
+        LAYOUT = blank;
+        saveLayoutLocal();
+        applyModuleLabels();
+        refreshLayoutViews();
+      }
+      return;
     }
+    LAYOUT = remote;
+    saveLayoutLocal();
+    applyModuleLabels();
+    refreshLayoutViews();
   } catch (e) { /* backend sans action loadLayout : config locale */ }
 }
 
