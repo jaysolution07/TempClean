@@ -254,6 +254,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .add-form label{font-size:12px;font-weight:700;color:var(--teal-dark);}
 .add-form input,.add-form select{border:1px solid #ccc;border-radius:7px;padding:8px 10px;font-size:14px;min-height:var(--touch-min);background:#fff;width:100%;}
 .add-form > div{flex:1;min-width:160px;}
+.module-labels{margin-top:12px;padding-top:12px;border-top:1px dashed #d5d5d5;}
+.module-labels > label{font-size:12px;font-weight:700;color:var(--teal-dark);}
+.mod-label-grid{display:grid;gap:6px;margin-top:6px;}
+.mod-label-row{display:flex;gap:6px;align-items:center;}
+.mod-label-ico{width:22px;text-align:center;font-size:16px;}
+.mod-label-row input{flex:1;min-width:0;border:1px solid #cfd8dc;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#263238;}
+.mod-label-row input:first-of-type{max-width:130px;font-weight:700;color:var(--teal-dark);}
+.mod-label-hint{font-size:11px;color:#78909c;margin-top:6px;}
 .zones-shortcut{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px dashed #d5d5d5;}
 .zones-shortcut > div{flex:1;min-width:150px;}
 .zones-shortcut label{font-size:12px;font-weight:700;color:var(--teal-dark);}
@@ -348,6 +356,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 /* ══ ÉDITEUR ZONES & MACHINES ══ */
 #zones-modal .modal-box{max-width:760px;}
 .zones-hint{font-size:12px;color:#666;margin-bottom:12px;line-height:1.5;}
+.zones-tpl-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.zones-tpl-row label{font-size:12px;font-weight:700;color:#37474f;white-space:nowrap;}
+.zones-tpl-row select{flex:1;padding:9px 10px;border:1px solid #cfd8dc;border-radius:8px;font-size:13px;background:#fff;color:#1B6B7B;font-weight:700;}
 .zones-body{max-height:58vh;overflow-y:auto;margin:0 -4px 14px;padding:0 4px;}
 .zone-card{border:1px solid #E0E0E0;border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#FAFAFA;}
 .zone-head{display:flex;gap:8px;align-items:center;}
@@ -523,11 +534,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     </div>
     <div class="sidebar-body">
       <div class="sidebar-section-title">Nettoyage hebdo</div>
-      <div class="sidebar-item" data-tab="chaud" onclick="sidebarNav('chaud',this)"><span class="si-icon">🔥</span> Labo Chaud</div>
-      <div class="sidebar-item" data-tab="froid" onclick="sidebarNav('froid',this)"><span class="si-icon">❄️</span> Labo Froid</div>
-      <div class="sidebar-item" data-tab="autres" onclick="sidebarNav('autres',this)"><span class="si-icon">🏭</span> Autres Zones</div>
+      <div class="sidebar-item" data-tab="chaud" onclick="sidebarNav('chaud',this)"><span class="si-icon">🔥</span> <span id="sidelbl-chaud">Laboratoire Chaud</span></div>
+      <div class="sidebar-item" data-tab="froid" onclick="sidebarNav('froid',this)"><span class="si-icon">❄️</span> <span id="sidelbl-froid">Laboratoire Froid</span></div>
+      <div class="sidebar-item" data-tab="autres" onclick="sidebarNav('autres',this)"><span class="si-icon">🏭</span> <span id="sidelbl-autres">Autres zones</span></div>
       <div class="sidebar-section-title">Fréquences</div>
-      <div class="sidebar-item" data-tab="biannuel" onclick="sidebarNav('biannuel',this)"><span class="si-icon">📅</span> Bi-Annuelles</div>
+      <div class="sidebar-item" data-tab="biannuel" onclick="sidebarNav('biannuel',this)"><span class="si-icon">📅</span> <span id="sidelbl-biannuel">Fréquences Bi-Annuelles</span></div>
       <div class="sidebar-section-title">Relevés</div>
       <div class="sidebar-item" data-tab="prelevements" onclick="sidebarNav('prelevements',this)"><span class="si-icon">🔬</span> Prélèvements</div>
       <div class="sidebar-item" data-tab="pesees" onclick="sidebarNav('pesees',this)"><span class="si-icon">⚖️</span> Pesées</div>
@@ -557,10 +568,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 </div>
 
 <div class="tabs" id="tabs-bar">
-    <div class="tab active" data-tab="chaud" onclick="switchTab('chaud',this)">🔥 Chaud</div>
-    <div class="tab" data-tab="froid" onclick="switchTab('froid',this)">❄️ Froid</div>
-    <div class="tab" data-tab="autres" onclick="switchTab('autres',this)">🏭 Autres</div>
-    <div class="tab" data-tab="biannuel" onclick="switchTab('biannuel',this)">📅 Bi-Ann.</div>
+    <div class="tab active" data-tab="chaud" onclick="switchTab('chaud',this)">🔥 <span id="tablbl-chaud">Chaud</span></div>
+    <div class="tab" data-tab="froid" onclick="switchTab('froid',this)">❄️ <span id="tablbl-froid">Froid</span></div>
+    <div class="tab" data-tab="autres" onclick="switchTab('autres',this)">🏭 <span id="tablbl-autres">Autres</span></div>
+    <div class="tab" data-tab="biannuel" onclick="switchTab('biannuel',this)">📅 <span id="tablbl-biannuel">Bi-Ann.</span></div>
     <div class="tab" data-tab="prelevements" onclick="switchTab('prelevements',this)">🔬 Prélèv.</div>
     <div class="tab" data-tab="pesees" onclick="switchTab('pesees',this)">⚖️ Pesées</div>
     <div class="tab" data-tab="maintenance" onclick="switchTab('maintenance',this)">🛠️ Machines</div>
@@ -581,7 +592,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 <div id="zones-modal" class="modal-overlay">
   <div class="modal-box">
     <h2 id="zones-title">🧩 Zones &amp; machines</h2>
-    <p class="zones-hint">Modifiez librement le nom des zones et des machines / lieux de ce module. Vous pouvez aussi créer ou supprimer des zones et des lignes. Les cases déjà cochées sont conservées pour les lignes existantes ; une ligne supprimée n'est plus affichée mais son historique n'est pas réutilisé.</p>
+    <div class="zones-tpl-row">
+      <label for="zones-module-select">Type de relevé</label>
+      <select id="zones-module-select" onchange="onZonesModuleChange(this.value)"></select>
+    </div>
+    <p class="zones-hint" id="zones-hint"></p>
     <div id="zones-body" class="zones-body"></div>
     <div class="zones-actions">
       <button class="btn" style="background:#E0F7FA;color:#1B6B7B" onclick="addZone()">➕ Zone</button>
@@ -841,7 +856,7 @@ async function enterApp(nom) {
   if (ENTERING) return;
   ENTERING = true;
   initLayout();          // zones & machines personnalisées (cache local immédiat)
-  syncLayoutFromServer(); // puis synchro silencieuse avec le backend
+  const layoutSync = syncLayoutFromServer(); // puis synchro silencieuse avec le backend
   try {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').classList.remove('visible');
@@ -850,6 +865,9 @@ async function enterApp(nom) {
     const nameEl = document.getElementById('boot-name');
     if (nameEl) nameEl.textContent = nom || 'Chargement des modules';
     const ok = await preloadAll();
+    // On attend la config du serveur AVANT de décider d'une page blanche : un client
+    // qui a déjà enregistré ses zones ne doit jamais être remis à zéro.
+    try { await layoutSync; } catch (e) {}
     if (!ok) {
       const lab = document.getElementById('boot-label');
       if (lab)      lab.innerHTML = 'Chargement incomplet — <button class="btn btn-sm" style="margin-left:8px" onclick="retryBoot()">Réessayer</button><button class="btn btn-sm" style="margin-left:6px" onclick="logout()">Se déconnecter</button>';
@@ -1568,28 +1586,69 @@ let LAYOUT_REMOTE_WARNED = false;
 function layoutNewId(p){ return p + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
 function layoutStoreKey(){ return LAYOUT_LS_PREFIX + (API_URL || 'local'); }
 
-function buildDefaultLayout(){
+
+// Client neuf (nouveau classeur + nouvelle URL) : aucune zone, aucune machine.
+function buildEmptyLayout(){
   const tabs = {};
-  LAYOUT_TABS.forEach(tabId => {
-    let slot = 0;
-    tabs[tabId] = {
-      sections: (DATA[tabId].sections || []).map(sec => ({
-        id: layoutNewId('z'),
-        name: sec.name,
-        items: (sec.items || []).map(it => ({
-          id: layoutNewId('m'), slot: slot++, n: it.n,
-          p: it.p || 'Semaines', ph: it.n === 'pH eau de rinçage'
-        }))
-      })),
-      nextSlot: slot
+  LAYOUT_TABS.forEach(tabId => { tabs[tabId] = { sections: [], nextSlot: 0 }; });
+  return { v: LAYOUT_VERSION, updated: 0, tabs: tabs, types: normalizeTypes(null), labels: normalizeModuleLabels(null) };
+}
+
+// L'app ne fabrique JAMAIS de zones toute seule : sans configuration enregistrée
+// (ni sur cet appareil, ni dans _LAYOUT_TC de SON classeur), le client démarre
+// vierge. Le modèle de départ ne s'installe que sur action explicite
+// (bouton « ↺ Charger le modèle de départ ») et n'est alors enregistré que pour
+// ce client.
+// ── Noms des zones du relevé (Chaud, Froid… renommables par client) ──
+const MODULE_DEFAULTS = {
+  chaud:    { short: 'Chaud',   long: 'Laboratoire Chaud' },
+  froid:    { short: 'Froid',   long: 'Laboratoire Froid' },
+  autres:   { short: 'Autres',  long: 'Autres zones' },
+  biannuel: { short: 'Bi-Ann.', long: 'Fréquences Bi-Annuelles' }
+};
+function normalizeModuleLabels(raw){
+  const out = {};
+  LAYOUT_TABS.forEach(t => {
+    const src = (raw && raw[t]) || {};
+    const d = MODULE_DEFAULTS[t];
+    out[t] = {
+      short: String(src.short || '').trim().slice(0, 18) || d.short,
+      long:  String(src.long  || '').trim().slice(0, 40) || d.long
     };
   });
-  return { v: LAYOUT_VERSION, updated: 0, tabs: tabs, types: normalizeTypes(null) };
+  return out;
+}
+function moduleLabel(t, kind){
+  initLayout();
+  const d = MODULE_DEFAULTS[t] || MODULE_DEFAULTS.autres;
+  const l = LAYOUT && LAYOUT.labels && LAYOUT.labels[t];
+  if (!l) return kind === 'short' ? d.short : d.long;
+  return kind === 'short' ? (l.short || d.short) : (l.long || d.long);
+}
+function setModuleLabel(t, kind, val){
+  initLayout();
+  if (LAYOUT_TABS.indexOf(t) === -1) return;
+  if (!LAYOUT.labels) LAYOUT.labels = normalizeModuleLabels(null);
+  const d = MODULE_DEFAULTS[t];
+  const v = String(val || '').trim().slice(0, kind === 'short' ? 18 : 40);
+  LAYOUT.labels[t][kind] = v || d[kind];
+  applyModuleLabels();
+  refreshLayoutViews();
+  persistLayout();
+}
+function applyModuleLabels(){
+  initLayout();
+  LAYOUT_TABS.forEach(t => {
+    const tabEl = document.getElementById('tablbl-' + t);
+    if (tabEl) tabEl.textContent = moduleLabel(t, 'short');
+    const sideEl = document.getElementById('sidelbl-' + t);
+    if (sideEl) sideEl.textContent = moduleLabel(t, 'long');
+  });
 }
 
 function normalizeLayout(raw){
   if (!raw || !raw.tabs) return null;
-  const out = { v: LAYOUT_VERSION, updated: Number(raw.updated) || 0, tabs: {}, types: normalizeTypes(raw.types) };
+  const out = { v: LAYOUT_VERSION, updated: Number(raw.updated) || 0, tabs: {}, types: normalizeTypes(raw.types), labels: normalizeModuleLabels(raw.labels) };
   LAYOUT_TABS.forEach(tabId => {
     const src = raw.tabs[tabId];
     if (!src || !Array.isArray(src.sections)) return;
@@ -1629,14 +1688,14 @@ function loadLayoutLocal(){
   } catch (e) { return null; }
 }
 function initLayout(){
-  if (!LAYOUT) LAYOUT = loadLayoutLocal() || buildDefaultLayout();
+  if (!LAYOUT) LAYOUT = loadLayoutLocal() || buildEmptyLayout();
   return LAYOUT;
 }
 // Sections affichées pour un module (avec les slots de données)
 function layoutData(tabId){
   initLayout();
   if (!LAYOUT || !LAYOUT.tabs[tabId]) return DATA[tabId];
-  return { title: DATA[tabId].title, sections: LAYOUT.tabs[tabId].sections };
+  return { title: moduleLabel(tabId, 'long'), sections: LAYOUT.tabs[tabId].sections };
 }
 function refreshLayoutViews(){
   if (S.tab && pendingStateTab(S.tab)) renderTab(S.tab);
@@ -1647,7 +1706,7 @@ async function persistLayout(){
   saveLayoutLocal();
   refreshLayoutViews();
   try {
-    const r = await api('saveLayout', { tabs: LAYOUT.tabs, types: LAYOUT.types, updated: LAYOUT.updated });
+    const r = await api('saveLayout', { tabs: LAYOUT.tabs, types: LAYOUT.types, labels: LAYOUT.labels, updated: LAYOUT.updated });
     if (!r || r.ok === false) throw new Error((r && r.error) || 'refus du serveur');
   } catch (e) {
     // Backend pas encore redéployé : on garde la config sur cet appareil.
@@ -1662,16 +1721,20 @@ async function syncLayoutFromServer(){
   try {
     const r = await api('loadLayout');
     if (!r || r.ok === false) return;
-    const remote = normalizeLayout({ tabs: r.tabs, types: r.types, updated: r.updated });
+    const remote = normalizeLayout({ tabs: r.tabs, types: r.types, labels: r.labels, updated: r.updated });
     if (!remote) return;
     const local = initLayout();
-    if (remote.updated > (Number(local.updated) || 0)) {
+    // Une config serveur existe dès qu'elle contient des zones : on la reprend même
+    // si son horodatage est vide (anciennes versions), pour ne jamais la perdre.
+    const remoteHasZones = LAYOUT_TABS.some(t => ((remote.tabs[t] || {}).sections || []).length);
+    if (remote.updated > (Number(local.updated) || 0) || (remoteHasZones && !Number(local.updated))) {
       remote.updated = Number(remote.updated) || 0;
       LAYOUT = remote;
       saveLayoutLocal();
+      applyModuleLabels();
       refreshLayoutViews();
     } else if ((Number(local.updated) || 0) > remote.updated) {
-      api('saveLayout', { tabs: local.tabs, types: local.types, updated: local.updated }).catch(() => {});
+      api('saveLayout', { tabs: local.tabs, types: local.types, labels: local.labels, updated: local.updated }).catch(() => {});
     }
   } catch (e) { /* backend sans action loadLayout : config locale */ }
 }
@@ -1681,10 +1744,29 @@ function openZonesEditor(tabId){
   initLayout();
   ZONES_TAB = tabId;
   try { localStorage.setItem('tc_zones_last_module', tabId); } catch (e) {}
-  const title = document.getElementById('zones-title');
-  if (title) title.textContent = '🧩 Zones & machines — ' + DATA[tabId].title;
+  const sel = document.getElementById('zones-module-select');
+  if (sel) sel.innerHTML = zoneModuleOptions(tabId, true);
+  refreshZonesHeader();
   renderZonesEditor();
   document.getElementById('zones-modal').style.display = 'flex';
+}
+function onZonesModuleChange(tabId){
+  if (LAYOUT_TABS.indexOf(tabId) === -1) return;
+  ZONES_TAB = tabId;
+  try { localStorage.setItem('tc_zones_last_module', tabId); } catch (e) {}
+  refreshZonesHeader();
+  renderZonesEditor();
+}
+// Titre + explication adaptés au template choisi (jours ou mois).
+function refreshZonesHeader(){
+  if (!ZONES_TAB) return;
+  const biannuel = ZONES_TAB === 'biannuel';
+  const title = document.getElementById('zones-title');
+  if (title) title.textContent = '🧩 Zones & machines — ' + moduleLabel(ZONES_TAB, 'long');
+  const hint = document.getElementById('zones-hint');
+  if (hint) hint.innerHTML = biannuel
+    ? 'Template <strong>bi-annuel</strong> : chaque ligne est cochée <strong>une fois par mois</strong> (cases = mois) dans le module Fréquences Bi-Annuelles.<br>Renommez, ajoutez ou supprimez librement zones et lignes : les coches existantes sont conservées.'
+    : 'Template <strong>quotidien</strong> : chaque ligne se coche <strong>chaque jour</strong> (cases = jours) dans le relevé de ce module.<br>Renommez, ajoutez ou supprimez librement zones et lignes : les coches existantes sont conservées.';
 }
 function closeZonesEditor(){
   ZONES_TAB = null;
@@ -1784,14 +1866,15 @@ function deleteZoneItem(si, ii){
 
 
 // ── Accès rapide aux zones depuis le menu Appareils ────────────────
-const ZONE_MODULE_LABELS = { chaud: 'Laboratoire Chaud', froid: 'Laboratoire Froid', autres: 'Autres zones', biannuel: 'Fréquences Bi-Annuelles' };
+// Deux templates : relevé quotidien (une case par JOUR) et relevé bi-annuel (une case par MOIS).
+const ZONE_MODULE_FREQ = { chaud: 'cases = jours', froid: 'cases = jours', autres: 'cases = jours', biannuel: 'cases = mois' };
 function lastZonesModule(){
   let m = 'autres';
   try { m = localStorage.getItem('tc_zones_last_module') || 'autres'; } catch (e) {}
   return LAYOUT_TABS.indexOf(m) === -1 ? 'autres' : m;
 }
-function zoneModuleOptions(sel){
-  return LAYOUT_TABS.map(t => `<option value="${t}"${t === sel ? ' selected' : ''}>${ZONE_MODULE_LABELS[t]}</option>`).join('');
+function zoneModuleOptions(sel, withFreq){
+  return LAYOUT_TABS.map(t => `<option value="${t}"${t === sel ? ' selected' : ''}>${moduleLabel(t, 'long')}${withFreq ? ' — ' + ZONE_MODULE_FREQ[t] : ''}</option>`).join('');
 }
 function openZonesFromManager(){
   const s = document.getElementById('zones-module-pick');
@@ -2250,6 +2333,7 @@ function applyBootstrap(r, opts = {}) {
 function refreshInBackground() { scheduleBgRefresh(); }
 
 async function initApp() {
+  applyModuleLabels();
   const tab = INIT_TAB || 'chaud';
   S.tab = tab;
   document.querySelectorAll('#tabs-bar .tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === tab));
@@ -3394,6 +3478,9 @@ function buildHebdo(tabId){
 
     });
   });
+    if(!d.sections.length){
+      html+=`<tr><td colspan="33" style="padding:26px 14px;text-align:center;color:#78909c;font-size:13px;line-height:1.6">Aucune zone pour l'instant — créez vos zones, vos machines et vos appareils.<br><button class="btn btn-sm" style="margin-top:10px;background:#E0F7FA;color:var(--teal-dark);border:1px solid #B2EBF2" onclick="openZonesEditor('${tabId}')">🧩 Créer mes zones / machines</button></td></tr>`;
+    }
   html+=`</tbody></table></div>
   <div class="comment-box"><h3>📝 Anomalies & Commentaires</h3>
     <textarea id="cmt-${tabId}" placeholder="Date + description des anomalies...">${esc(S.comments[tabId]||'')}</textarea>
@@ -3424,6 +3511,9 @@ function buildBiannuel(){
 
     });
   });
+    if(!d.sections.length){
+      html+=`<tr><td colspan="14" style="padding:26px 14px;text-align:center;color:#78909c;font-size:13px;line-height:1.6">Aucune zone pour l'instant — créez vos zones et vos machines.<br><button class="btn btn-sm" style="margin-top:10px;background:#E0F7FA;color:var(--teal-dark);border:1px solid #B2EBF2" onclick="openZonesEditor('biannuel')">🧩 Créer mes zones / machines</button></td></tr>`;
+    }
   html+=`</tbody></table></div>
   <div class="comment-box"><h3>📝 Anomalies & Commentaires</h3>
     <textarea id="cmt-biannuel" placeholder="Date + description...">${esc(S.comments['biannuel']||'')}</textarea>
@@ -3519,6 +3609,7 @@ function buildTempMat(app){
 // ════════════════════════════════════════════════════════════════════
 //  BUILD MANAGER APPAREILS
 // ════════════════════════════════════════════════════════════════════
+const MODULE_ICONS = { chaud: '🔥', froid: '❄️', autres: '🏭', biannuel: '📅' };
 function buildManager(){
   const actifs=S.appareils.filter(a=>a.actif),inactifs=S.appareils.filter(a=>!a.actif);
   let cards=actifs.map(a=>buildCard(a,true)).join('')||'<p style="color:#999;font-size:13px;padding:10px 0">Aucun appareil actif.</p>';
@@ -3528,6 +3619,16 @@ function buildManager(){
     <div><label>Nom de l'appareil</label><input type="text" id="new-nom" placeholder="Ex: Chambre froide sud" style="margin-top:5px"></div>
     <div><label>Type</label><select id="new-type" style="margin-top:5px">${typeOptions()}</select><button class="btn btn-sm" style="margin-top:5px;width:100%;background:#F3E5F5;color:#6A1B9A" onclick="openTypesEditor()">✏️ Renommer les types</button></div>
     <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="ajouterAppareil()">➕ Ajouter un appareil</button>
+  </div>
+  <div class="module-labels">
+    <label>🏷️ Noms des zones du relevé</label>
+    <div class="mod-label-grid">
+      ${LAYOUT_TABS.map(t => `<div class="mod-label-row"><span class="mod-label-ico">${MODULE_ICONS[t]}</span>
+        <input type="text" maxlength="18" value="${esc(moduleLabel(t,'short'))}" placeholder="Onglet" onchange="setModuleLabel('${t}','short',this.value)">
+        <input type="text" maxlength="40" value="${esc(moduleLabel(t,'long'))}" placeholder="Nom complet" onchange="setModuleLabel('${t}','long',this.value)">
+      </div>`).join('')}
+    </div>
+    <div class="mod-label-hint">À gauche le nom de l'onglet, à droite le nom complet (titres, menus, éditeur de zones).</div>
   </div>
   <div class="zones-shortcut">
     <div><label>Zones &amp; machines du relevé</label><select id="zones-module-pick" style="margin-top:5px">${zoneModuleOptions(lastZonesModule())}</select></div>
