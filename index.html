@@ -165,7 +165,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .topbar h1{font-size:15px;font-weight:700;white-space:nowrap;}
 .topbar .sub{font-size:10px;opacity:.75;margin-top:1px;}
 #conn-status{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.15);color:#fff;white-space:nowrap;}
-.demo-pill{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);color:#fff;white-space:nowrap;}
 .topbar-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .btn{border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all .15s;padding:8px 14px;font-size:13px;min-height:var(--touch-min);display:inline-flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation;}
 .btn:active{transform:scale(.96);opacity:.85;}
@@ -542,7 +541,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     </div>
     <div class="topbar-right">
       <span id="conn-status">⏳</span>
-      <span id="demo-pill" class="demo-pill" style="display:none">Demo investisseurs</span>
       <button class="btn btn-white btn-sm" onclick="printPage()">🖨️</button>
       <button class="btn btn-sm" style="background:#7B1FA2;color:#fff" onclick="showCloture()">📦 Clôturer</button>
       <button id="btn-logout" class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff" onclick="logout()" title="Déconnexion">🚪</button>
@@ -556,6 +554,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
       <div class="sub" id="sidebar-ss-name">Menu</div>
     </div>
     <div class="sidebar-body">
+<div class="sidebar-item" data-tab="dashboard" onclick="sidebarNav('dashboard',this)">
+  <span class="si-icon">📊</span> Tableau de bord
+</div>
       <div class="sidebar-section-title">Nettoyage hebdo</div>
       <div class="sidebar-item" data-tab="chaud" onclick="sidebarNav('chaud',this)"><span class="si-icon">🔥</span> <span id="sidelbl-chaud">Laboratoire Chaud</span></div>
       <div class="sidebar-item" data-tab="froid" onclick="sidebarNav('froid',this)"><span class="si-icon">❄️</span> <span id="sidelbl-froid">Laboratoire Froid</span></div>
@@ -565,10 +566,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
       <div class="sidebar-section-title">Relevés</div>
       <div class="sidebar-item" data-tab="prelevements" onclick="sidebarNav('prelevements',this)"><span class="si-icon">🔬</span> Prélèvements</div>
       <div class="sidebar-item" data-tab="pesees" onclick="sidebarNav('pesees',this)"><span class="si-icon">⚖️</span> Pesées</div>
-      <div class="sidebar-section-title">Historique</div>
-<div class="sidebar-item" data-tab="dashboard" onclick="sidebarNav('dashboard',this)">
-  <span class="si-icon">📊</span> Tableau de bord
-</div>
 <div class="sidebar-section-title">Températures</div>
 <div class="sidebar-item" data-tab="temp-manager" onclick="sidebarNav('temp-manager',this)">
   <span class="si-icon">🌡️</span> Appareils
@@ -595,6 +592,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 </div>
 
 <div class="tabs" id="tabs-bar">
+    <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 Tableau</div>
     <div class="tab active" data-tab="chaud" onclick="switchTab('chaud',this)">🔥 <span id="tablbl-chaud">Chaud</span></div>
     <div class="tab" data-tab="froid" onclick="switchTab('froid',this)">❄️ <span id="tablbl-froid">Froid</span></div>
     <div class="tab" data-tab="autres" onclick="switchTab('autres',this)">🏭 <span id="tablbl-autres">Autres</span></div>
@@ -604,7 +602,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div class="tab" data-tab="maintenance" onclick="switchTab('maintenance',this)">🛠️ Machines</div>
     <div class="tab" data-tab="freezer" onclick="switchTab('freezer',this)">🧊 Congelateur</div>
     <div class="tab-div"></div>
-    <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard',this)">📊 Tableau</div>
     <div class="tab" data-tab="temp-manager" onclick="switchTab('temp-manager',this)">⚙️ Appareils <span class="badge" id="badge-app">0</span></div>
     <div class="tab" data-tab="elog" onclick="switchTab('elog',this)">📋 E-Log</div>
   </div>
@@ -704,8 +701,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 const MASTER_API_URL = 'https://script.google.com/macros/s/AKfycby0OG523BTRizlCMUvVIJ9vWoGe4yMHjf1iIAWNpgsiS0LDhtQxFTiZkSuaFl_g-5N3/exec';
 // URL directe d'une Web App (fallback si la feuille MASTER ne fournit pas de WEBAPPURL)
 const DIRECT_API_URL = '';
-const DEMO_MODE = false;
-const DEMO_COMPANY_NAME = 'TempClean Demo Investors';
 
 // ════════════════════════════════════════════════════════════════════
 //  LOGIN
@@ -787,8 +782,6 @@ function clearSession(){
 }
 
 async function doLogin() {
-  if (DEMO_MODE) { startDemoSession(); return; }
-
   clearLoginError();
 
   const id = document.getElementById('inp-id').value.trim();
@@ -868,13 +861,6 @@ function showApp(nomEntreprise) {
   // 🔐 garde toujours l'URL API en mémoire
   if (API_URL) saveSession(API_URL, nomEntreprise || loadSession().nom);
 
-  if (DEMO_MODE) {
-    const pill = document.getElementById('demo-pill');
-    const btn = document.getElementById('btn-logout');
-    if (pill) pill.style.display = 'inline-flex';
-    if (btn) btn.style.display = 'none';
-  }
-
   initApp();
   startKeepalive();
 }
@@ -917,7 +903,6 @@ function retryBoot() {
 }
 
 function logout() {
-  if (DEMO_MODE) { toast('Mode demo actif - deconnexion desactivee'); return; }
   if (!confirm('Se déconnecter ?')) return;
   // Stoppe le keepalive et invalide tout refresh d'arrière-plan en cours
   if (KEEPALIVE_TIMER) { clearInterval(KEEPALIVE_TIMER); KEEPALIVE_TIMER = null; }
@@ -950,10 +935,6 @@ function logout() {
 }
 
 window.onload = () => {
-  if (DEMO_MODE) {
-    startDemoSession();
-    return;
-  }
   if (tryOpenFromMasterRedirect()) return;
   // Rouvre sur le dernier onglet utilisé (restauration de session)
   INIT_TAB = localStorage.getItem('tc_last_tab') || sessionStorage.getItem('tc_last_tab') || 'chaud';
@@ -973,8 +954,6 @@ window.onload = () => {
 //  API
 // ════════════════════════════════════════════════════════════════════
 async function api(action, params = {}, opts = {}) {
-  if (DEMO_MODE) return demoApi(action, params);
-
   // 🔐 Sécurité : recharge l'URL API depuis la session si elle a sauté
   if (!API_URL) {
     API_URL = loadSession().url;
@@ -1078,7 +1057,6 @@ async function fetchWithRetry(url, options, maxAttempts = 2, timeoutMs = API_TIM
 }
 
 async function masterApi(action, params={}) {
-  if (DEMO_MODE) return demoMasterApi(action, params);
   if (!MASTER_API_URL) return null;
   try {
     const res = await fetchWithRetry(MASTER_API_URL, {
@@ -1130,7 +1108,7 @@ let SESSION_ID = 0; // incrémenté à chaque connexion/déconnexion (annule les
 let DATA_REV = 0;   // > 0 si l'utilisateur a modifié l'onglet affiché pendant un refresh
 
 function startBootstrapPrefetch() {
-  if (DEMO_MODE || !API_URL) return;
+  if (!API_URL) return;
   preloadAll();
 }
 
@@ -1525,9 +1503,9 @@ function scheduleBgRefresh() { return runSyncLoop(); }
 // Garde le script Apps Script éveillé pendant qu'un utilisateur travaille
 // (1 ping toutes les 4 min → plus de cold start de 10-30 s en plein milieu).
 function startKeepalive() {
-  if (DEMO_MODE || KEEPALIVE_TIMER || !API_URL) return;
+  if (KEEPALIVE_TIMER || !API_URL) return;
   KEEPALIVE_TIMER = setInterval(() => {
-    if (!API_URL || DEMO_MODE || document.visibilityState === 'hidden') return;
+    if (!API_URL || document.visibilityState === 'hidden') return;
     api('ping').catch(() => {});
   }, 4 * 60 * 1000);
 }
@@ -1747,7 +1725,7 @@ async function persistLayout(){
   }
 }
 async function syncLayoutFromServer(){
-  if (!API_URL || DEMO_MODE) return;
+  if (!API_URL) return;
   try {
     const r = await api('loadLayout');
     if (!r || r.ok === false) return; // backend sans loadLayout : on garde la config locale
@@ -2001,407 +1979,6 @@ const S = {
 };
 let elogRows = [];
 let BOOTSTRAP_OK = true; // false si le backend ne connaît pas encore l'action 'bootstrap'
-
-function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
-function demoUnique(arr){ return [...new Set(arr.filter(n => n >= 1 && n <= 31))].sort((a,b)=>a-b); }
-function demoMonthDays(pattern, seed){
-  const s = seed % 4;
-  const low = String(pattern || '').toLowerCase();
-  if (low.includes('jour')) return demoUnique([1+s,4+s,7+s,10+s,13+s,16+s,19+s,22+s,25+s,28+s]);
-  if (low.includes('cycle')) return demoUnique([4+s,11+s,18+s,25+s]);
-  if (low.includes('mois')) return demoUnique([8+s,21+s]);
-  return demoUnique([2+s,9+s,16+s,23+s,30-s]);
-}
-function buildDemoHebdoState(tabId, month, visa, comment){
-  const state = { _month: month, _visa: visa, _comment: comment };
-  for (let day = 1; day <= 31; day++) state['BIO__'+day] = ![7,14,21,28].includes(day);
-  let idx = 0;
-  DATA[tabId].sections.forEach(sec => sec.items.forEach((item) => {
-    demoMonthDays(item.p, idx + tabId.length).forEach(day => {
-      state['i'+idx+'__'+day] = true;
-      if (item.n === 'pH eau de rinçage') state['ph__i'+idx+'__'+day] = (7 + ((day + idx) % 8) / 10).toFixed(1);
-    });
-    idx++;
-  }));
-  return state;
-}
-function buildDemoBiannuelState(){
-  const state = {
-    _month: '2026',
-    _visa: 'QM',
-    _comment: 'Janvier 2026 - nettoyage semestriel realise sur plafonds et murs. Septembre 2026 - controle ventilation negatif renforce apres poussiere au niveau des grilles.'
-  };
-  MONTHS.forEach((_, mi) => { state['BIO__'+mi] = ![3,9].includes(mi); });
-  let idx = 0;
-  DATA.biannuel.sections.forEach(sec => sec.items.forEach((item) => {
-    let months = [0,6];
-    const p = String(item.p || '').toLowerCase();
-    if (p.includes('3 mois')) months = [0,3,6,9];
-    else if (p.includes('mois')) months = [1,7];
-    else if (p.includes('ann')) months = [8];
-    months.forEach(mi => { state['i'+idx+'__'+mi] = true; });
-    idx++;
-  }));
-  return state;
-}
-function buildDemoNegState(profile){
-  const state = {};
-  for (let day = 1; day <= 31; day++) {
-    const am = profile.amAlerts?.[day] ?? (day % 11 === 0 ? -15 : day % 6 === 0 ? -17 : -18);
-    const pm = profile.pmAlerts?.[day] ?? (day % 13 === 0 ? -14 : day % 5 === 0 ? -17 : -19);
-    state[`${am}__${day}__AM`] = true;
-    state[`${pm}__${day}__PM`] = true;
-  }
-  return state;
-}
-function buildDemoMatState(profile){
-  const state = {};
-  for (let day = 1; day <= 31; day++) {
-    const temp = profile.alerts?.[day] ?? (day % 9 === 0 ? 6 : day % 4 === 0 ? 5 : day % 3 === 0 ? 3 : 4);
-    state[`${temp}__${day}`] = true;
-  }
-  return state;
-}
-function createDemoStore(){
-  const appareils = [
-    { id:'cf_neg_stock', nom:'Chambre froide negative stock', type:'neg', actif:true },
-    { id:'cf_neg_expe', nom:'Chambre froide expedition', type:'neg', actif:true },
-    { id:'cuve_vanille', nom:'Cuve maturation vanille', type:'mat', actif:true },
-    { id:'cuve_fraise', nom:'Cuve maturation fraise', type:'mat', actif:true },
-    { id:'armoire_tests', nom:'Armoire tests R&D', type:'mat', actif:false }
-  ];
-  return {
-    appareils,
-    appMeta: {
-      cf_neg_stock:{ moisAnnee:'2026-03', visa:'ML' },
-      cf_neg_expe:{ moisAnnee:'2026-03', visa:'SD' },
-      cuve_vanille:{ moisAnnee:'2026-03', visa:'LM' },
-      cuve_fraise:{ moisAnnee:'2026-03', visa:'TC' }
-    },
-    comments: {
-      app_cf_neg_stock:'06/03/2026 - pointe a -15C sur la tournee du matin, porte restee ouverte 4 minutes pendant dechargement. 07/03/2026 - verification joint OK.',
-      app_cf_neg_expe:'13/03/2026 - ecart transitoire sur la releve PM, reprise a -19C apres degivrage et controle sonde.',
-      app_cuve_vanille:'09/03/2026 - cuve restee a 6C avant corrective. Lot bloque 20 min, recontrole conforme a 4C.',
-      app_cuve_fraise:'18/03/2026 - derive a 5C en fin de poste. Nettoyage sonde et verification agitation effectues.',
-      chaud:'12/03/2026 - pH eau de rincage a 7.8 sur circuit pasteurisateur, rincage prolonge puis validation a 7.2. 24/03/2026 - filtre Mix-Plant remplace apres encrassement visuel.',
-      froid:'11/03/2026 - piece evasee signee en retard sur l equipe nuit. Rattrapage fait avant demarrage du lot fraise. 21/03/2026 - CIP cuve renforce suite a residu gras en controle visuel.',
-      autres:'05/03/2026 - local poubelle nettoye avec retard apres surcharge expedition. 17/03/2026 - vestiaires remis en conformite apres rappel hygiene.',
-      biannuel:'S1 2026 - campagne semestrielle realisee a 96 pourcent. Reste a planifier le plafond reserve emballages sur semaine 40.'
-    },
-    hebdo: {
-      [SHEET_NAMES.chaud]: buildDemoHebdoState('chaud','2026-03','ML','12/03/2026 - pH eau de rincage a 7.8 sur circuit pasteurisateur, rincage prolonge puis validation a 7.2.\n24/03/2026 - filtre Mix-Plant remplace apres encrassement visuel.'),
-      [SHEET_NAMES.froid]: buildDemoHebdoState('froid','2026-03','SD','11/03/2026 - piece evasee signee en retard sur l equipe nuit.\n21/03/2026 - CIP cuve renforce suite a residu gras en controle visuel.'),
-      [SHEET_NAMES.autres]: buildDemoHebdoState('autres','2026-03','TC','05/03/2026 - local poubelle nettoye avec retard apres surcharge expedition.\n17/03/2026 - vestiaires remis en conformite apres rappel hygiene.')
-    },
-    biannuel: buildDemoBiannuelState(),
-    appStates: {
-      cf_neg_stock: buildDemoNegState({ amAlerts:{6:-15,18:-16}, pmAlerts:{13:-14,27:-15} }),
-      cf_neg_expe: buildDemoNegState({ amAlerts:{8:-16,20:-15}, pmAlerts:{10:-14,25:-15} }),
-      cuve_vanille: buildDemoMatState({ alerts:{9:6,19:6,27:5} }),
-      cuve_fraise: buildDemoMatState({ alerts:{18:5,22:6,30:5} }),
-      armoire_tests: buildDemoMatState({ alerts:{15:5} })
-    },
-    prelevements: [
-      { _rowIndex:1, date:'03/03/2026 09:20', operateur:'M. Leroy', surface:'Doseuse 4 becs', resJaune:'8', resRouge:'0', actionsCor:'RAS - nettoyage valide' },
-      { _rowIndex:2, date:'06/03/2026 14:10', operateur:'S. Dupont', surface:'Poignee chambre froide expedition', resJaune:'27', resRouge:'0', actionsCor:'Desinfection immediate, reprise du plan de nettoyage sur les poignees.' },
-      { _rowIndex:3, date:'11/03/2026 08:40', operateur:'L. Martin', surface:'Plan de travail conditionnement', resJaune:'14', resRouge:'0', actionsCor:'RAS - seuils conformes' },
-      { _rowIndex:4, date:'17/03/2026 16:05', operateur:'T. Colin', surface:'Bouton CIP laboratoire froid', resJaune:'39', resRouge:'1', actionsCor:'Arret production 20 min, nettoyage renforce, sensibilisation equipe et contre-analyse planifiee.' },
-      { _rowIndex:5, date:'24/03/2026 10:15', operateur:'M. Leroy', surface:'Cuve maturation vanille', resJaune:'19', resRouge:'0', actionsCor:'RAS - tendance a surveiller' },
-      { _rowIndex:6, date:'28/03/2026 07:55', operateur:'S. Dupont', surface:'Table emballage secondaire', resJaune:'6', resRouge:'0', actionsCor:'RAS' }
-    ],
-    pesees: [
-      { _rowIndex:1, date:'04/03/2026 09:10', produit:'Yaourt nature 125g', poidsTheorique:'125,0', poidsReel1:'124,8', poidsReel2:'125,2', poidsReel3:'124,9', actions:'RAS', visa:'ML' },
-      { _rowIndex:2, date:'07/03/2026 11:30', produit:'Dessert vanille 100g', poidsTheorique:'100,0', poidsReel1:'98,9', poidsReel2:'99,1', poidsReel3:'99,0', actions:'Reglage tete doseuse n2', visa:'SD' },
-      { _rowIndex:3, date:'12/03/2026 15:05', produit:'Fromage frais 250g', poidsTheorique:'250,0', poidsReel1:'251,2', poidsReel2:'250,8', poidsReel3:'251,0', actions:'RAS', visa:'LM' },
-      { _rowIndex:4, date:'18/03/2026 08:25', produit:'Coulis fraise 500g', poidsTheorique:'500,0', poidsReel1:'493,8', poidsReel2:'494,2', poidsReel3:'493,5', actions:'Blocage palette 45 min, recalage peseuse puis reprise', visa:'TC' },
-      { _rowIndex:5, date:'25/03/2026 13:45', produit:'Yaourt grec 150g', poidsTheorique:'150,0', poidsReel1:'150,7', poidsReel2:'150,4', poidsReel3:'150,5', actions:'RAS', visa:'ML' }
-    ],
-    logs: [
-      { rowIndex:301, date:'2026-03-03 07:12:11', nom:DEMO_COMPANY_NAME, id:'mleroy', event:'LOGIN', detail:'Connexion responsable qualite' },
-      { rowIndex:302, date:'2026-03-03 17:58:47', nom:DEMO_COMPANY_NAME, id:'', event:'CLOTURE', detail:'2026-02 - Fevrier' },
-      { rowIndex:303, date:'2026-03-05 06:54:22', nom:DEMO_COMPANY_NAME, id:'sdupont', event:'LOGIN', detail:'Connexion chef equipe matin' },
-      { rowIndex:304, date:'2026-03-06 14:15:03', nom:DEMO_COMPANY_NAME, id:'sdupont', event:'LOGIN_FAIL', detail:'Mot de passe incorrect - 1 tentative restante' },
-      { rowIndex:305, date:'2026-03-11 08:02:19', nom:DEMO_COMPANY_NAME, id:'lmartin', event:'LOGIN', detail:'Consultation releves froid et pesees' },
-      { rowIndex:306, date:'2026-03-17 16:44:12', nom:DEMO_COMPANY_NAME, id:'tcolin', event:'LOGIN', detail:'Saisie prelevements de surface' },
-      { rowIndex:307, date:'2026-03-22 18:01:58', nom:DEMO_COMPANY_NAME, id:'', event:'CLOTURE', detail:'2026-S1 - Bi-Annuel' },
-      { rowIndex:308, date:'2026-03-28 09:07:32', nom:DEMO_COMPANY_NAME, id:'invest-demo', event:'LOGIN', detail:'Session demonstration investisseurs' }
-    ]
-  };
-}
-const DEMO_STORE = createDemoStore();
-function demoSheetNameToTab(sheetName){
-  if (sheetName === 'Fréquences Bi-Annuelles') return 'biannuel';
-  return Object.keys(SHEET_NAMES).find(tab => SHEET_NAMES[tab] === sheetName);
-}
-function demoNextRow(rows){ return rows.length ? Math.max(...rows.map(r => Number(r._rowIndex || r.rowIndex || 0))) + 1 : 1; }
-const DEMO_HISTO = [];
-function demoCoches(state, prefix, from, to){
-  const jours = [];
-  if (!state) return jours;
-  for (let d = from; d <= to; d++) if (state[prefix + '__' + d] === true) jours.push(d);
-  return jours;
-}
-function demoPackZone(tabId, nom, state, mensuel){
-  const from = mensuel ? 1 : 0, to = mensuel ? 31 : 11;
-  const lignes = [];
-  const bio = demoCoches(state, 'BIO', from, to);
-  if (bio.length) lignes.push({ zone:'', nom:'Produit BIO', jours: bio });
-  let idx = 0;
-  ((DATA[tabId] && DATA[tabId].sections) || []).forEach(sec => (sec.items || []).forEach(it => {
-    lignes.push({ zone: sec.name, nom: it.n, jours: demoCoches(state, 'i' + idx, from, to) });
-    idx++;
-  }));
-  return { id: tabId, nom: nom, mois: (state && state._month) || '', visa: (state && state._visa) || '', comment: (state && state._comment) || '', lignes: lignes };
-}
-function demoPackApp(app){
-  const state = DEMO_STORE.appStates[app.id] || {};
-  const serie = {};
-  Object.keys(state).forEach(k => {
-    if (state[k] !== true) return;
-    if (app.type === 'neg') {
-      const m = /^(-?\d+)__(\d+)__(AM|PM)$/.exec(k);
-      if (!m) return;
-      if (!serie[m[2]]) serie[m[2]] = {};
-      const t = Number(m[1]);
-      if (serie[m[2]][m[3]] === undefined || t > serie[m[2]][m[3]]) serie[m[2]][m[3]] = t;
-    } else {
-      const m = /^(-?\d+)__(\d+)$/.exec(k);
-      if (!m) return;
-      const t = Number(m[1]);
-      if (serie[m[2]] === undefined || t > serie[m[2]]) serie[m[2]] = t;
-    }
-  });
-  const meta = DEMO_STORE.appMeta[app.id] || {};
-  return { id: app.id, nom: app.nom, type: app.type, mois: meta.moisAnnee || '', visa: meta.visa || '', comment: '', serie: serie };
-}
-function demoArchiver(type, label){
-  const quand = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  if (type === 'bi') {
-    DEMO_HISTO.unshift({ type:'bi', mois: quand, label: label, clotureLe: quand, data: { zones: [demoPackZone('biannuel', 'Fréquences Bi-Annuelles', DEMO_STORE.biannuel, false)], appareils: [] } });
-  } else {
-    const mois = moisDepuisLabel(label) || '2026-03';
-    const i = DEMO_HISTO.findIndex(e => e.type === 'mois' && e.mois === mois);
-    if (i >= 0) DEMO_HISTO.splice(i, 1);
-    const zones = ['chaud','froid','autres'].map(id => demoPackZone(id, (DATA[id] && DATA[id].title) || id, DEMO_STORE.hebdo[SHEET_NAMES[id]], true));
-    DEMO_HISTO.unshift({ type:'mois', mois: mois, label: label, clotureLe: quand, data: { zones: zones, appareils: DEMO_STORE.appareils.filter(a => a.actif).map(demoPackApp) } });
-  }
-  const mois = DEMO_HISTO.filter(e => e.type === 'mois').slice(0, 6);
-  const bi = DEMO_HISTO.filter(e => e.type === 'bi').slice(0, 6);
-  DEMO_HISTO.length = 0;
-  mois.concat(bi).forEach(e => DEMO_HISTO.push(e));
-}
-function demoHistorique(params){
-  if (!DEMO_HISTO.length) demoArchiver('mois', '2026-03 – Mars');
-  const clotures = DEMO_HISTO.map(e => ({ id: e.type + '|' + e.mois, type: e.type, mois: e.mois, label: e.label, clotureLe: e.clotureLe, zones: (e.data.zones || []).length, appareils: (e.data.appareils || []).length }));
-  const found = params && params.id ? DEMO_HISTO.find(e => (e.type + '|' + e.mois) === params.id) : null;
-  return { ok: true, clotures: clotures, data: found ? found.data : null, max: 6 };
-}
-async function demoApi(action, params={}){
-  switch(action){
-    case 'ping': return { ok:true };
-    case 'bootstrap': {
-      const states = {};
-      Object.keys(DEMO_STORE.hebdo || {}).forEach(k => { states[k] = deepClone(DEMO_STORE.hebdo[k]); });
-      states['Fréquences Bi-Annuelles'] = deepClone(DEMO_STORE.biannuel || {});
-      Object.keys(DEMO_STORE.appStates || {}).forEach(id => { states['App_' + id] = deepClone(DEMO_STORE.appStates[id]); });
-      const only = params.state;
-      return { ok:true, appareils:deepClone(DEMO_STORE.appareils), states: only ? (states[only] ? { [only]: states[only] } : {}) : states };
-    }
-    case 'loadPack': {
-      const boot = await demoApi('bootstrap', {});
-      return {
-        ok:true,
-        appareils: boot.appareils,
-        states: boot.states,
-        prelevements: deepClone(DEMO_STORE.prelevements || []),
-        pesees: deepClone(DEMO_STORE.pesees || []),
-        machines: deepClone(DEMO_STORE.machines || []),
-        maintenance: deepClone(DEMO_STORE.maintenanceRows || []),
-        freezerItems: deepClone(DEMO_STORE.freezerItems || []),
-        freezerMeta: deepClone(DEMO_STORE.freezerMeta || {})
-      };
-    }
-    case 'getAppData': return { appareils:deepClone(DEMO_STORE.appareils), comments:deepClone(DEMO_STORE.comments), meta:deepClone(DEMO_STORE.appMeta) };
-    case 'loadHebdoState': return deepClone(DEMO_STORE.hebdo[params.sheetName] || {});
-    case 'loadBiannuelState': return deepClone(DEMO_STORE.biannuel);
-    case 'loadAppareilState': return deepClone(DEMO_STORE.appStates[params.appareilId] || {});
-    case 'loadPrelevements': return { rows:deepClone(DEMO_STORE.prelevements) };
-    case 'loadPesees': return { rows:deepClone(DEMO_STORE.pesees) };
-    case 'saveHebdo': {
-      const st = DEMO_STORE.hebdo[params.sheetName] || (DEMO_STORE.hebdo[params.sheetName] = {});
-      const key = params.itemName === 'BIO' ? `BIO__${params.day}` : `${params.itemName}__${params.day}`;
-      st[key] = params.value;
-      return { ok:true };
-    }
-    case 'saveMeta': {
-      const st = DEMO_STORE.hebdo[params.sheetName] || (DEMO_STORE.hebdo[params.sheetName] = {});
-      st._month = params.moisAnnee || st._month || '2026-03';
-      st._visa = params.visa || '';
-      return { ok:true };
-    }
-    case 'saveComment': {
-      const tab = demoSheetNameToTab(params.sheetName);
-      if (tab === 'biannuel') DEMO_STORE.biannuel._comment = params.comment || '';
-      else if (tab) DEMO_STORE.hebdo[SHEET_NAMES[tab]]._comment = params.comment || '';
-      if (tab) DEMO_STORE.comments[tab] = params.comment || '';
-      return { ok:true };
-    }
-    case 'saveBiannuel': {
-      const key = params.itemName === 'BIO' ? `BIO__${params.monthIndex}` : `${params.itemName}__${params.monthIndex}`;
-      DEMO_STORE.biannuel[key] = params.value;
-      return { ok:true };
-    }
-    case 'saveAppareilTemp': {
-      const st = DEMO_STORE.appStates[params.appareilId] || (DEMO_STORE.appStates[params.appareilId] = {});
-      const key = params.slot ? `${params.tempVal}__${params.day}__${params.slot}` : `${params.tempVal}__${params.day}`;
-      st[key] = params.value;
-      return { ok:true };
-    }
-    case 'saveAppareilComment':
-      DEMO_STORE.comments['app_'+params.appareilId] = params.comment || '';
-      return { ok:true };
-    case 'saveAppareilMeta':
-      DEMO_STORE.appMeta[params.appareilId] = { moisAnnee:params.moisAnnee || '2026-03', visa:params.visa || '' };
-      return { ok:true };
-    case 'addPrelevement': {
-      const row = { _rowIndex:demoNextRow(DEMO_STORE.prelevements), ...params };
-      DEMO_STORE.prelevements.push(row);
-      return { ok:true, _rowIndex:row._rowIndex };
-    }
-    case 'updatePrelevement': {
-      const idx = DEMO_STORE.prelevements.findIndex(r => String(r._rowIndex) === String(params._rowIndex));
-      if (idx < 0) return { ok:false, error:'Prelevement introuvable' };
-      DEMO_STORE.prelevements[idx] = { ...DEMO_STORE.prelevements[idx], ...params };
-      return { ok:true };
-    }
-    case 'deletePrelevement':
-      DEMO_STORE.prelevements = DEMO_STORE.prelevements.filter(r => String(r._rowIndex) !== String(params._rowIndex));
-      return { ok:true };
-    case 'addPesee': {
-      const row = { _rowIndex:demoNextRow(DEMO_STORE.pesees), ...params };
-      DEMO_STORE.pesees.push(row);
-      return { ok:true, _rowIndex:row._rowIndex };
-    }
-    case 'updatePesee': {
-      const idx = DEMO_STORE.pesees.findIndex(r => String(r._rowIndex) === String(params._rowIndex));
-      if (idx < 0) return { ok:false, error:'Pesee introuvable' };
-      DEMO_STORE.pesees[idx] = { ...DEMO_STORE.pesees[idx], ...params };
-      return { ok:true };
-    }
-    case 'deletePesee':
-      DEMO_STORE.pesees = DEMO_STORE.pesees.filter(r => String(r._rowIndex) !== String(params._rowIndex));
-      return { ok:true };
-    case 'clearPrelevements':
-      DEMO_STORE.prelevements = [];
-      return { ok:true };
-    case 'clearPesees':
-      DEMO_STORE.pesees = [];
-      return { ok:true };
-    case 'loadFreezerData':
-      return { ok:true, items:deepClone(DEMO_STORE.freezerItems || []), meta:deepClone(DEMO_STORE.freezerMeta || {}) };
-    case 'addFreezerItem': {
-      const row = { _rowIndex:demoNextRow(DEMO_STORE.freezerItems || []), id:params.id || ('fz_'+Date.now()), produit:params.produit || '', emplacements:params.emplacements || '', checked:params.checked === true };
-      DEMO_STORE.freezerItems = DEMO_STORE.freezerItems || [];
-      DEMO_STORE.freezerItems.push(row);
-      return { ok:true, _rowIndex:row._rowIndex, id:row.id };
-    }
-    case 'updateFreezerItem': {
-      DEMO_STORE.freezerItems = DEMO_STORE.freezerItems || [];
-      const idx = DEMO_STORE.freezerItems.findIndex(r => String(r._rowIndex) === String(params._rowIndex));
-      if (idx < 0) return { ok:false, error:'Produit congelateur introuvable' };
-      DEMO_STORE.freezerItems[idx] = { ...DEMO_STORE.freezerItems[idx], ...params };
-      return { ok:true };
-    }
-    case 'deleteFreezerItem':
-      DEMO_STORE.freezerItems = (DEMO_STORE.freezerItems || []).filter(r => String(r._rowIndex) !== String(params._rowIndex));
-      return { ok:true };
-    case 'saveFreezerMeta':
-      DEMO_STORE.freezerMeta = { ...(DEMO_STORE.freezerMeta || {}), ...params };
-      return { ok:true };
-    case 'resetFreezerChecks':
-      DEMO_STORE.freezerItems = (DEMO_STORE.freezerItems || []).map(r => ({ ...r, checked:false }));
-      return { ok:true };
-    case 'addAppareil': {
-      const id = ('app_'+Date.now()).replace(/[^a-z0-9_]/gi,'').toLowerCase();
-      const app = { id, nom:params.nom, type:params.type, actif:true };
-      DEMO_STORE.appareils.push(app);
-      DEMO_STORE.appStates[id] = {};
-      DEMO_STORE.comments['app_'+id] = '';
-      return deepClone(app);
-    }
-    case 'dupliquerAppareil': {
-      const source = DEMO_STORE.appareils.find(a => a.id === params.sourceId);
-      if (!source) throw new Error('Appareil source introuvable');
-      const id = `${source.id}_copie_${Date.now()}`;
-      const app = { ...source, id, nom:`${source.nom} copie`, actif:true };
-      DEMO_STORE.appareils.push(app);
-      DEMO_STORE.appStates[id] = deepClone(DEMO_STORE.appStates[source.id] || {});
-      DEMO_STORE.comments['app_'+id] = DEMO_STORE.comments['app_'+source.id] || '';
-      return deepClone(app);
-    }
-    case 'renommerAppareil': {
-      const app = DEMO_STORE.appareils.find(a => a.id === params.id);
-      if (!app) throw new Error('Appareil introuvable');
-      app.nom = params.nouveauNom;
-      return { ok:true };
-    }
-    case 'supprimerAppareil': {
-      const app = DEMO_STORE.appareils.find(a => a.id === params.id);
-      if (app) app.actif = false;
-      return { ok:true };
-    }
-    case 'reactiverAppareil': {
-      const app = DEMO_STORE.appareils.find(a => a.id === params.id);
-      if (app) app.actif = true;
-      return { ok:true };
-    }
-    case 'supprimerDefinitivement':
-      DEMO_STORE.appareils = DEMO_STORE.appareils.filter(a => a.id !== params.id);
-      delete DEMO_STORE.appStates[params.id];
-      delete DEMO_STORE.comments['app_'+params.id];
-      delete DEMO_STORE.appMeta[params.id];
-      return { ok:true };
-    case 'getHistorique':
-      return demoHistorique(params);
-    case 'cloturerBiannuel':
-      demoArchiver('bi', params.label || 'Bi-annuel');
-      DEMO_STORE.biannuel = { _month:'2026', _visa:'', _comment:'' };
-      return { ok:true };
-    case 'cloturerMois':
-      demoArchiver('mois', params.moisLabel || params.label || 'Mois');
-      return { ok:true };
-    default:
-      return { ok:true };
-  }
-}
-async function demoMasterApi(action, params={}){
-  switch(action){
-    case 'getLogs': return { ok:true, rows:deepClone(DEMO_STORE.logs).slice(0, params.limit || 300) };
-    case 'deleteLog':
-      DEMO_STORE.logs = DEMO_STORE.logs.filter(r => String(r.rowIndex) !== String(params.rowIndex));
-      return { ok:true };
-    case 'clearLogs':
-      DEMO_STORE.logs = [];
-      return { ok:true };
-    case 'logEvent':
-      DEMO_STORE.logs.unshift({ rowIndex:demoNextRow(DEMO_STORE.logs), date:'2026-03-30 10:00:00', nom:params.nom || DEMO_COMPANY_NAME, id:params.id || '', event:params.event || 'INFO', detail:params.detail || '' });
-      return { ok:true };
-    case 'login':
-      return { ok:true, webappUrl:'demo://tempclean', nom:DEMO_COMPANY_NAME };
-    default:
-      return { ok:true };
-  }
-}
-function startDemoSession(){
-  API_URL = 'demo://tempclean';
-  saveSession(API_URL, DEMO_COMPANY_NAME);
-  const pill = document.getElementById('demo-pill');
-  if (pill) pill.style.display = 'inline-flex';
-  const btn = document.getElementById('btn-logout');
-  if (btn) btn.style.display = 'none';
-  document.getElementById('login-screen').style.display = 'none';
-  enterApp(DEMO_COMPANY_NAME);
-}
 
 // ════════════════════════════════════════════════════════════════════
 //  INIT APP (appelé après login réussi)
