@@ -414,6 +414,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .boot-track{height:12px;background:#E0F2F1;border-radius:99px;overflow:hidden;margin-top:10px;}
 #boot-fill{height:100%;width:0;background:linear-gradient(90deg,#00796B,#26C6DA);transition:width .35s ease;}
 #boot-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#boot-detail{display:none;font-size:11.5px;line-height:1.55;color:#B71C1C;margin-top:12px;word-break:break-word;text-align:left;}
 </style>
 </head>
 <body>
@@ -489,6 +490,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div class="boot-sub" id="boot-name">Chargement des modules</div>
     <div class="boot-row"><span id="boot-label">Connexion…</span><span id="boot-pct">0%</span></div>
     <div class="boot-track"><div id="boot-fill"></div></div>
+    <div id="boot-detail"></div>
   </div>
 </div>
 
@@ -656,7 +658,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 //  ⚙️ CONFIGURATION — REMPLACE CES DEUX URLs
 // ════════════════════════════════════════════════════════════════════
 
-const MASTER_API_URL = 'https://script.google.com/macros/s/AKfycbyFDe7zKHJ9lW7tl7N5DuQ143sj8V3kk0sHxsgklYjANysIsNtqKq4EjrApH6lAYIt0/exec';
+const MASTER_API_URL = 'https://script.google.com/macros/s/AKfycby0OG523BTRizlCMUvVIJ9vWoGe4yMHjf1iIAWNpgsiS0LDhtQxFTiZkSuaFl_g-5N3/exec';
 // URL directe d'une Web App (fallback si la feuille MASTER ne fournit pas de WEBAPPURL)
 const DIRECT_API_URL = '';
 const DEMO_MODE = false;
@@ -851,9 +853,11 @@ async function enterApp(nom) {
     if (!ok) {
       const lab = document.getElementById('boot-label');
       if (lab)      lab.innerHTML = 'Chargement incomplet — <button class="btn btn-sm" style="margin-left:8px" onclick="retryBoot()">Réessayer</button><button class="btn btn-sm" style="margin-left:6px" onclick="logout()">Se déconnecter</button>';
+      bootDetail('Données : ' + dataHost(API_URL) + ' — ' + (LOAD_FAIL || 'échec sans détail'));
       return;
     }
     if (gate) gate.style.display = 'none';
+    bootDetail('');
     showApp(nom);
   } finally {
     ENTERING = false;
@@ -861,6 +865,8 @@ async function enterApp(nom) {
 }
 function retryBoot() {
   PRELOAD = null;
+  LOAD_FAIL = '';
+  bootDetail('');
   enterApp(loadSession().nom || document.getElementById('boot-name').textContent || '');
 }
 
@@ -947,11 +953,27 @@ async function api(action, params = {}, opts = {}) {
       throw new Error('HTTP ' + res.status);
     }
 
-    return await res.json();
+    const raw = await res.text();
+    // ⚠️ Réponse HTML = page d'erreur Google (accès au déploiement non public)
+    if (raw.trim().charAt(0) === '<') {
+      const shown = (raw.match(/<title>([^<]*)<\/title>/) || [])[1] || 'page HTML';
+      const denied = /autoris|not authorized|sign in|connexion/i.test(raw);
+      throw Object.assign(new Error('Page HTML au lieu de données — ' + (denied
+        ? "accès refusé par Google : dans Apps Script, le déploiement doit être en /exec, « Exécuter en tant que : moi » et « Qui a accès : tout le monde »"
+        : 'réponse inattendue du serveur de données (' + shown + ')')), { isDiag: true });
+    }
+    try { return JSON.parse(raw); }
+    catch (e) { throw Object.assign(new Error('Réponse illisible du serveur de données : ' + raw.slice(0, 60)), { isDiag: true }); }
 
   } catch (e) {
     console.error("Erreur API :", e);
-    throw new Error("Impossible de joindre Google Sheets : " + e.message);
+    if (e && e.isDiag) throw e;
+    const m = String((e && e.message) || '');
+    // CORS / réseau : Apps Script renvoie une page de connexion sans en-têtes CORS
+    if (/Failed to fetch|Load failed|NetworkError|Network request failed/i.test(m)) {
+      throw Object.assign(new Error("aucun accès au serveur de données : dans Apps Script, le déploiement doit être en /exec, « Exécuter en tant que : moi » et « Qui a accès : tout le monde »"), { isDiag: true });
+    }
+    throw new Error("Impossible de joindre Google Sheets : " + m);
   } finally {
     releaseApiSlot();
   }
@@ -1139,6 +1161,20 @@ function paintCurrentFromStates() {
 let PRELOAD = null;
 let LOAD_TICK = null;
 let BOOT_LOGS = null;
+let LOAD_FAIL = '';
+
+// Diagnostic de démarrage : dit quelle URL de données est utilisée et pourquoi ça bloque
+function bootDetail(msg){
+  const el=document.getElementById('boot-detail');
+  if(!el)return;
+  if(!msg){el.style.display='none';el.textContent='';return;}
+  el.style.display='block';el.textContent=msg;
+}
+function dataHost(u){
+  if(!u)return '(aucune URL de données)';
+  const m=String(u).match(/\/macros\/s\/([A-Za-z0-9_-]{6,})/);
+  return m ? ('…'+m[1].slice(-8)+(String(u).indexOf('/exec')!==-1?'/exec':' (pas /exec)')) : String(u).slice(0,60);
+}
 
 function setLoadProgress(pct, label) {
   const n = Math.max(0, Math.min(100, pct));
@@ -1312,11 +1348,17 @@ async function preloadAll() {
   if (PRELOAD) return PRELOAD;
   const sid = SESSION_ID;
   const job = (async () => {
+    LOAD_FAIL = '';
+    if (!API_URL) {
+      LOAD_FAIL = "aucune URL de données reçue du master : la colonne WEBAPPURL de la feuille MASTER est vide pour ce compte";
+      return false;
+    }
     const creep = startCreep(8, 92, 'Chargement des modules…');
     try {
       const logsFromLogin = BOOT_LOGS;
       BOOT_LOGS = null;
-      const packP = api('loadPack', {}, { attempts: 1, timeout: 45000 }).then(function(v) { return v; }).catch(function() { return null; });
+      let packErr = null;
+      const packP = api('loadPack', {}, { attempts: 1, timeout: 45000 }).then(function(v) { return v; }).catch(function(e) { packErr = e; return null; });
       const logP = logsFromLogin ? Promise.resolve({ ok: true, rows: logsFromLogin }) : masterApi('getLogs', { limit: 200 });
       let both = await Promise.all([packP, logP]);
       let r = both[0];
@@ -1326,20 +1368,31 @@ async function preloadAll() {
       const unknown = !!(r && r.ok === false && String(r.error || '').indexOf('inconnue') !== -1);
       if (unknown) {
         const stepped = await preloadStepByStep(sid);
+        if (!stepped) LOAD_FAIL = 'le serveur de données ne reconnaît pas loadPack : ' + String((r && r.error) || '');
         if (!stepped || sid !== SESSION_ID) return false;
         setLoadProgress(100, 'Tous les modules sont prêts');
         return true;
       }
       if (!r || !r.ok) {
-        r = await api('loadPack', {}, { attempts: 1, timeout: 45000 }).catch(function() { return null; });
+        r = await api('loadPack', {}, { attempts: 1, timeout: 45000 }).catch(function(e) { packErr = e; return null; });
       }
-      if (sid !== SESSION_ID || !r || !r.ok) return false;
+      if (sid !== SESSION_ID || !r || !r.ok) {
+        LOAD_FAIL = !r
+          ? ('aucune réponse du serveur de données' + (packErr ? ' : ' + packErr.message : ' (URL ou accès public incorrect)'))
+          : ('loadPack refusé : ' + String(r.error || 'sans détail'));
+        return false;
+      }
       if (r.migrating) {
         applyPack(r);
         if (!(await waitSnapshot(sid))) return false;
       } else applyPack(r);
       if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
-      if (sid !== SESSION_ID || !packReady()) return false;
+      if (sid !== SESSION_ID) return false;
+      if (!packReady()) {
+        const miss = ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer'].filter(t => !S.loaded.has(t));
+        LOAD_FAIL = 'modules non chargés : ' + miss.join(', ');
+        return false;
+      }
       setLoadProgress(100, 'Tous les modules sont prêts');
       return true;
     } finally {
