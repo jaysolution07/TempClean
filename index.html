@@ -437,6 +437,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .db-tabs{display:flex;gap:8px;margin:12px 0;}
 .db-tabs button{border:none;background:#eceff1;color:#455a64;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer;}
 .db-tabs button.on{background:#1B6B7B;color:#fff;}
+.db-svg{width:100%;height:auto;display:block;background:#f7fbfc;border-radius:10px;}
 .db-checks{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px;}
 .db-checks label{display:flex;align-items:center;gap:6px;background:#f7fbfc;border:1px solid #d7eef2;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;color:#1B6B7B;}
 #boot-screen{display:none;position:fixed;inset:0;z-index:12000;background:linear-gradient(165deg,#0D4F5B 0%,#1B6B7B 55%,#14808F 100%);align-items:center;justify-content:center;padding:24px;}
@@ -3846,7 +3847,7 @@ function moisDepuisLabel(label){
   if (mm < 1 || mm > 12) return '';
   return m[1] + '-' + String(mm).padStart(2, '0');
 }
-function dbReset(){ S.histoList = null; S.histoData = {}; S.dbId = ''; }
+function dbReset(){ S.histoList = null; S.histoData = {}; S.dbId = ''; S.dbVue = ''; S.histoErr = ''; }
 
 async function openDashboard(){
   const c = document.getElementById('main-content');
@@ -3856,34 +3857,38 @@ async function openDashboard(){
       const r = await api('getHistorique', {});
       if (!r || r.ok === false) throw new Error((r && r.error) || 'Historique illisible');
       S.histoList = r.clotures || [];
-      if (!S.dbId && S.histoList[0]) S.dbId = S.histoList[0].id;
+      S.histoErr = '';
     } catch (e) {
-      if (S.tab === 'dashboard') c.innerHTML = '<div class="db-card">⚠️ ' + esc(e.message) + '<div style="margin-top:10px"><button class="btn btn-sm btn-primary" onclick="dbReset();openDashboard()">Réessayer</button></div></div>';
-      return;
+      S.histoList = [];
+      S.histoErr = e.message || 'Historique illisible';
     }
   }
   if (S.tab !== 'dashboard') return;
-  const liste = S.histoList || [];
-  if (!liste.length) {
-    c.innerHTML = '<div class="db-card"><h3>📊 Tableau de bord</h3><p>Aucune clôture archivée pour l’instant. La prochaine clôture du mois (zones et appareils) ou bi-annuelle sera conservée ici.</p><p class="db-note">Seules les <strong>6 dernières</strong> clôtures de chaque type sont gardées, pour ne pas alourdir l’application.</p></div>';
-    return;
-  }
-  if (!liste.some(x => x.id === S.dbId)) S.dbId = liste[0].id;
-  const opts = liste.map(x => '<option value="' + esc(x.id) + '"' + (x.id === S.dbId ? ' selected' : '') + '>' + esc(x.label || x.mois) + (x.type === 'bi' ? ' · bi-annuel' : ' · mois') + '</option>').join('');
+  S.histoList = dbAvecMoisEnCours(S.histoList);
+  if (!S.dbId || !S.histoList.some(x => x.id === S.dbId)) S.dbId = '__live__';
+  const liste = S.histoList;
+  const opts = liste.map(x => '<option value="' + esc(x.id) + '"' + (x.id === S.dbId ? ' selected' : '') + '>' + esc(x.live ? 'Mois en cours' : ((x.label || x.mois) + (x.type === 'bi' ? ' · bi-annuel' : ' · mois'))) + '</option>').join('');
   c.innerHTML = '<div class="db-card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3 style="margin:0">📊 Tableau de bord</h3><button class="btn btn-sm btn-primary" onclick="dbReset();openDashboard()">🔄 Actualiser</button></div>'
     + '<div class="db-filters" style="margin-top:12px"><div class="db-field"><label>Clôture</label><select onchange="dbChoisir(this.value)">' + opts + '</select></div></div>'
     + '<p class="db-note">Historique des zones et des appareils. Seules les <strong>6 dernières</strong> clôtures de chaque type sont conservées.</p></div>'
     + '<div id="db-body"><div class="loading"><div class="spinner"></div><span>Chargement…</span></div></div>';
   await dbAfficher();
 }
-async function dbChoisir(id){ S.dbId = id; S.dbVue = 'zones'; await dbAfficher(); }
+async function dbChoisir(id){
+  S.dbId = id;
+  const meta = (S.histoList || []).find(x => x.id === id);
+  S.dbVue = (meta && meta.type === 'bi') ? 'zones' : 'appareils';
+  await dbAfficher();
+}
 function dbVue(v){ S.dbVue = v; const el = document.getElementById('db-body'); if (el && S.histoData && S.histoData[S.dbId]) el.innerHTML = dbCorps(S.histoData[S.dbId], (S.histoList || []).find(x => x.id === S.dbId)); }
 async function dbAfficher(){
   const el = document.getElementById('db-body');
   if (!el || S.tab !== 'dashboard') return;
   try {
     if (!S.histoData) S.histoData = {};
-    if (!S.histoData[S.dbId]) {
+    if (S.dbId === '__live__') {
+      S.histoData.__live__ = { appareils: dbLiveAppareils(), zones: [] };
+    } else if (!S.histoData[S.dbId]) {
       const r = await api('getHistorique', { id: S.dbId });
       if (!r || r.ok === false || !r.data) throw new Error((r && r.error) || 'Clôture introuvable');
       S.histoData[S.dbId] = r.data;
@@ -3897,12 +3902,17 @@ async function dbAfficher(){
 }
 function dbCorps(data, meta){
   const bi = meta && meta.type === 'bi';
-  const vue = S.dbVue || 'zones';
-  let html = '<div class="db-tabs">'
-    + '<button class="' + (vue === 'zones' ? 'on' : '') + '" onclick="dbVue(\'zones\')">🧩 Zones</button>'
-    + (bi ? '' : '<button class="' + (vue === 'appareils' ? 'on' : '') + '" onclick="dbVue(\'appareils\')">🌡️ Appareils</button>')
-    + '<button class="btn btn-sm" style="margin-left:auto;background:#7B1FA2;color:#fff" onclick="dbPdf()">📄 PDF</button></div>';
-  if (vue === 'appareils' && !bi) html += dbAppareils(data);
+  const live = meta && meta.live;
+  if (live) S.dbVue = 'appareils';
+  else if (!S.dbVue) S.dbVue = bi ? 'zones' : 'appareils';
+  const vue = bi ? 'zones' : S.dbVue;
+  let html = '<div class="db-tabs">';
+  if (!live) html += '<button class="' + (vue === 'zones' ? 'on' : '') + '" onclick="dbVue(\'zones\')">🧩 Zones</button>';
+  if (!bi) html += '<button class="' + (vue === 'appareils' ? 'on' : '') + '" onclick="dbVue(\'appareils\')">🌡️ Appareils</button>';
+  html += '<button class="btn btn-sm" style="margin-left:auto;background:#7B1FA2;color:#fff" onclick="dbPdf()">📄 Retélécharger le PDF' + (live ? ' (en cours)' : '') + '</button>';
+  html += '</div>';
+  if (S.histoErr && live) html += '<p class="db-note">Archives non lues (' + esc(S.histoErr) + '). Le mois en cours reste affiché.</p>';
+  if (vue === 'appareils' && !bi) html += dbAppareils(data, !!live);
   else html += dbZones(data, bi);
   return html;
 }
@@ -3929,86 +3939,248 @@ function dbZones(data, bi){
       + '<div style="overflow:auto"><table class="db-table"><thead><tr><th>Zone</th><th>Ligne</th><th>' + (bi ? 'Mois cochés' : 'Jours cochés') + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   }).join('');
 }
-function dbPoint(app, day){
+function dbAvecMoisEnCours(liste){
+  const live = { id: '__live__', type: 'mois', label: 'Mois en cours', mois: '', clotureLe: '', live: true };
+  return [live].concat((liste || []).filter(x => x.id !== '__live__'));
+}
+function dbLiveAppareils(){
+  return (S.appareils || []).filter(a => a.actif).map(a => {
+    const ck = S.appChecks[a.id] || {};
+    const serie = {};
+    Object.keys(ck).forEach(k => {
+      if (!ck[k]) return;
+      if (a.type === 'neg') {
+        const m = /^(-?\d+)__(\d+)__(AM|PM)$/.exec(k);
+        if (!m) return;
+        if (!serie[m[2]]) serie[m[2]] = {};
+        const t = Number(m[1]);
+        if (serie[m[2]][m[3]] === undefined || t > serie[m[2]][m[3]]) serie[m[2]][m[3]] = t;
+      } else {
+        const m = /^(-?\d+)__(\d+)$/.exec(k);
+        if (!m) return;
+        const t = Number(m[1]);
+        if (serie[m[2]] === undefined || t > serie[m[2]]) serie[m[2]] = t;
+      }
+    });
+    return { id: a.id, nom: a.nom, type: a.type || 'mat', serie: serie };
+  });
+}
+function dbReleve(app, day, slot){
   const s = (app.serie || {})[String(day)];
   if (s === undefined || s === null) return null;
-  if (typeof s === 'number') return s;
-  const vals = ['AM','PM'].map(k => s[k]).filter(v => typeof v === 'number');
-  if (!vals.length) return null;
-  return Math.max.apply(null, vals);
+  if (typeof s === 'number') return slot ? null : s;
+  if (!slot) {
+    const vals = ['AM','PM'].map(k => s[k]).filter(v => typeof v === 'number');
+    return vals.length ? Math.max.apply(null, vals) : null;
+  }
+  return typeof s[slot] === 'number' ? s[slot] : null;
 }
-function dbAppareils(data){
+function dbPoint(app, day){ return dbReleve(app, day, null); }
+function dbKpi(app){
+  const neg = app.type === 'neg';
+  const slots = neg ? ['AM','PM'] : [null];
+  const valeurs = [];
+  const alertes = [];
+  for (let d = 1; d <= 31; d++) {
+    slots.forEach(slot => {
+      const v = dbReleve(app, d, slot);
+      if (v === null) return;
+      valeurs.push(v);
+      if (neg ? v >= -15 : v >= 6) alertes.push(d + (slot ? ' ' + slot : ''));
+    });
+  }
+  let somme = 0, conformes = 0;
+  valeurs.forEach(v => { somme += v; if (neg ? v <= -18 : v <= 4) conformes++; });
+  const denom = neg ? 62 : 31;
+  return {
+    releves: valeurs.length,
+    couverture: Math.round(valeurs.length / denom * 100),
+    moyenne: valeurs.length ? Math.round(somme / valeurs.length * 10) / 10 : null,
+    min: valeurs.length ? Math.min.apply(null, valeurs) : null,
+    max: valeurs.length ? Math.max.apply(null, valeurs) : null,
+    conformite: valeurs.length ? Math.round(conformes / valeurs.length * 100) : 0,
+    alertes: alertes
+  };
+}
+function dbAppareils(data, live){
   const apps = data.appareils || [];
-  if (!apps.length) return '<div class="db-card">Aucun appareil dans cette clôture.</div>';
+  if (!apps.length) return '<div class="db-card">Aucun appareil' + (live ? ' actif' : ' dans cette clôture') + '.</div>';
   if (!S.dbApps) S.dbApps = {};
   apps.forEach(a => { if (S.dbApps[a.id] === undefined) S.dbApps[a.id] = true; });
   const choisis = apps.filter(a => S.dbApps[a.id]);
-  const checks = apps.map(a => '<label><input type="checkbox" ' + (S.dbApps[a.id] ? 'checked' : '') + ' onchange="dbToggleApp(\'' + esc(a.id) + '\',this.checked)"> ' + esc(a.nom) + '</label>').join('');
-  let releves = 0, alertes = 0, somme = 0, n = 0;
-  const series = [];
-  choisis.forEach((a, i) => {
-    const neg = a.type === 'neg';
-    const pts = [];
-    for (let d = 1; d <= 31; d++) {
-      const t = dbPoint(a, d);
-      pts.push(t);
-      if (t === null) continue;
-      releves++; somme += t; n++;
-      if (neg ? t >= -15 : t >= 6) alertes++;
-    }
-    series.push({ nom: a.nom, couleur: DB_COLORS[i % DB_COLORS.length], pts: pts });
-  });
-  const moy = n ? Math.round(somme / n * 10) / 10 : null;
-  return '<div class="db-card"><h3>Appareils de cette clôture</h3><div class="db-checks">' + checks + '</div></div>'
-    + '<div class="db-kpis"><div class="db-kpi"><div class="v">' + releves + '</div><div class="l">Jours relevés</div></div>'
-    + '<div class="db-kpi"><div class="v">' + (moy === null ? '—' : moy + ' °C') + '</div><div class="l">Température moyenne</div></div>'
-    + '<div class="db-kpi' + (alertes ? ' bad' : '') + '"><div class="v">' + alertes + '</div><div class="l">Jours en alerte</div></div></div>'
-    + '<div class="db-card"><h3>Courbe des températures</h3>' + dbCourbe(series) + '<p class="db-note">Un jour non coché laisse un trou. Si plusieurs cases sont cochées le même jour, la température la plus haute est retenue. Négatif : alerte ≥ −15 °C. Positif / maturation : alerte ≥ 6 °C.</p></div>';
+  const checks = apps.map(a => '<label><input type="checkbox" ' + (S.dbApps[a.id] ? 'checked' : '') + ' onchange="dbToggleApp(\'' + String(a.id).replace(/'/g, '') + '\',this.checked)"> ' + esc(a.nom) + '</label>').join('');
+  const negatifs = choisis.filter(a => a.type === 'neg');
+  const positifs = choisis.filter(a => a.type !== 'neg');
+  let html = '<div class="db-card"><h3>🌡️ Courbes des températures' + (live ? ' — mois en cours' : '') + '</h3><div class="db-checks">' + checks + '</div>'
+    + '<p class="db-note">Même lecture que TEMPRO : un point par jour coché, un trou si le jour n’est pas relevé. Plusieurs cases le même jour : la température la plus haute est gardée. Le négatif trace le matin (trait plein) et l’après-midi (pointillés).</p></div>';
+  if (!choisis.length) return html + '<div class="db-card">Cochez au moins un appareil pour afficher sa courbe.</div>';
+  if (positifs.length) html += dbBlocCourbe('Positif et maturation', positifs, false);
+  if (negatifs.length) html += dbBlocCourbe('Négatif', negatifs, true);
+  return html;
 }
-function dbToggleApp(id, on){ S.dbApps[id] = on; dbVue('appareils'); }
-function dbCourbe(series){
-  const W = 760, H = 210, mL = 36, mR = 10, mT = 12, mB = 26;
-  let lo = 0, hi = 8, any = false;
-  series.forEach(s => s.pts.forEach(v => { if (v === null) return; any = true; lo = Math.min(lo, v); hi = Math.max(hi, v); }));
-  if (!any) return '<p class="db-note">Aucune température cochée.</p>';
-  lo -= 1; hi += 1;
-  const px = d => mL + (d - 1) / 30 * (W - mL - mR);
-  const py = t => mT + (hi - t) / (hi - lo) * (H - mT - mB);
-  const f = n => Math.round(n * 10) / 10;
-  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="background:#f7fbfc;border-radius:10px">';
-  for (let d = 1; d <= 31; d += 5) svg += '<text x="' + f(px(d)) + '" y="' + (H - 6) + '" font-size="10" fill="#78909c" text-anchor="middle">' + d + '</text>';
-  series.forEach(s => {
-    let seg = '', segs = [];
-    s.pts.forEach((v, i) => {
-      if (v === null) { if (seg) { segs.push(seg); seg = ''; } return; }
-      seg += (seg ? ' ' : '') + f(px(i + 1)) + ',' + f(py(v));
+function dbBlocCourbe(titre, apps, neg){
+  const series = [];
+  apps.forEach((a, i) => {
+    const couleur = DB_COLORS[i % DB_COLORS.length];
+    const slots = neg ? ['AM','PM'] : [null];
+    slots.forEach(slot => {
+      const pts = [];
+      for (let d = 1; d <= 31; d++) pts.push(dbReleve(a, d, slot));
+      series.push({ nom: a.nom + (slot ? ' ' + slot : ''), couleur: couleur, pts: pts, dash: slot === 'PM', alerte: neg ? -15 : 6 });
     });
-    if (seg) segs.push(seg);
-    segs.forEach(g => { if (g.indexOf(' ') < 0) return; svg += '<polyline fill="none" stroke="' + s.couleur + '" stroke-width="2.2" points="' + g + '"/>'; });
   });
-  svg += '</svg><div class="db-note">' + series.map(s => '<span style="color:' + s.couleur + ';font-weight:700;margin-right:10px">' + esc(s.nom) + '</span>').join('') + '</div>';
-  return svg;
+  const rows = apps.map(a => {
+    const k = dbKpi(a);
+    return '<tr><td>' + esc(a.nom) + '</td><td>' + k.releves + '</td><td>' + k.couverture + '%</td><td>' + (k.moyenne === null ? '—' : k.moyenne + ' °C') + '</td><td>' + (k.min === null ? '—' : k.min) + '</td><td>' + (k.max === null ? '—' : k.max) + '</td><td>' + k.alertes.length + '</td><td>' + k.conformite + '%</td></tr>';
+  }).join('');
+  return '<div class="db-card"><h3>📈 ' + titre + (neg ? ' <span style="color:#90a4ae;font-weight:600">≤ −18 °C cible · ≥ −15 °C alerte</span>' : ' <span style="color:#90a4ae;font-weight:600">≤ 4 °C cible · ≥ 6 °C alerte</span>') + '</h3>'
+    + dbSvg(series, neg)
+    + '<div class="db-note" style="margin-bottom:10px">' + apps.map((a, i) => '<span style="color:' + DB_COLORS[i % DB_COLORS.length] + ';font-weight:700;margin-right:12px">' + esc(a.nom) + '</span>').join('') + '</div>'
+    + '<div style="overflow:auto"><table class="db-table"><thead><tr><th>Appareil</th><th>Relevés</th><th>Couverture</th><th>Moyenne</th><th>Mini</th><th>Maxi</th><th>Alertes</th><th>Conformité</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+function dbToggleApp(id, on){ if (!S.dbApps) S.dbApps = {}; S.dbApps[id] = on; dbVue('appareils'); }
+function dbSvg(series, neg){
+  const W = 780, H = 300, mL = 46, mR = 14, mT = 14, mB = 30;
+  const TMAX = neg ? -9 : 9, TMIN = neg ? -22 : -1;
+  const pw = W - mL - mR, ph = H - mT - mB;
+  const px = d => mL + (d - 1) / 30 * pw;
+  const py = t => mT + (TMAX - t) / (TMAX - TMIN) * ph;
+  const f = n => Number(n).toFixed(1);
+  const bande = (haut, bas, fill) => '<rect x="' + mL + '" y="' + f(py(haut)) + '" width="' + pw + '" height="' + f(py(bas) - py(haut)) + '" fill="' + fill + '"/>';
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="db-svg" role="img">';
+  if (neg) {
+    s += bande(-9, -15, '#FFEBEE');
+    s += bande(-15, -18, '#FFF8E1');
+    s += bande(-18, -22, '#E8F5E9');
+  } else {
+    s += bande(9, 6, '#FFEBEE');
+    s += bande(6, 4, '#FFF8E1');
+    s += bande(4, -1, '#E8F5E9');
+  }
+  const seuils = neg ? [-15, -18] : [6, 4];
+  for (let t = TMAX; t >= TMIN; t--) {
+    const seuil = seuils.indexOf(t) >= 0;
+    const stroke = (neg ? t === -15 : t === 6) ? '#C62828' : ((neg ? t === -18 : t === 4) ? '#2E7D32' : '#cfd8dc');
+    s += '<line x1="' + mL + '" y1="' + f(py(t)) + '" x2="' + (W - mR) + '" y2="' + f(py(t)) + '" stroke="' + stroke + '" stroke-width="' + (seuil ? 1.4 : 0.7) + '"' + (seuil ? ' stroke-dasharray="5 4"' : '') + '/>';
+    s += '<text x="' + (mL - 6) + '" y="' + f(py(t) + 4) + '" font-size="11" fill="#607D8B" text-anchor="end">' + t + '°</text>';
+  }
+  for (let d = 1; d <= 31; d++) {
+    if (!(d === 1 || d === 31 || d % 5 === 0)) continue;
+    s += '<text x="' + f(px(d)) + '" y="' + (H - 8) + '" font-size="11" fill="#607D8B" text-anchor="middle">' + d + '</text>';
+  }
+  series.forEach(ser => {
+    let seg = [], segments = [];
+    ser.pts.forEach((v, i) => {
+      if (v === null || v === undefined) { if (seg.length) { segments.push(seg); seg = []; } return; }
+      seg.push(f(px(i + 1)) + ',' + f(py(v)));
+    });
+    if (seg.length) segments.push(seg);
+    segments.forEach(sg => {
+      if (sg.length < 2) return;
+      s += '<polyline fill="none" stroke="' + ser.couleur + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" points="' + sg.join(' ') + '"' + (ser.dash ? ' stroke-dasharray="6 4"' : '') + '/>';
+    });
+    ser.pts.forEach((v, i) => {
+      if (v === null || v === undefined) return;
+      const chaud = v >= ser.alerte;
+      s += '<circle cx="' + f(px(i + 1)) + '" cy="' + f(py(v)) + '" r="' + (chaud ? 4.4 : 3.2) + '" fill="' + (chaud ? '#C62828' : ser.couleur) + '"><title>' + esc(ser.nom) + ' — ' + (i + 1) + ' : ' + v + ' °C</title></circle>';
+    });
+  });
+  s += '</svg>';
+  return s;
+}
+function dbJourCoche(jours, d){ return (jours || []).some(j => Number(j) === d); }
+function dbCase(on){ return '<div class="cb-wrap"><input type="checkbox"' + (on ? ' checked' : '') + ' disabled></div>'; }
+function dbGrilleZone(z, bi){
+  const n = bi ? 12 : 31;
+  const heads = bi ? MONTHS : Array.from({ length: n }, (_, i) => i + 1);
+  let html = '<div class="meta-row"><label>' + (bi ? 'Période' : 'Mois / Année') + ' :</label><input type="text" value="' + esc(z.mois || '') + '" disabled>'
+    + '<label>Visa :</label><input type="text" style="width:90px" value="' + esc(z.visa || '') + '" disabled>'
+    + '<strong style="color:var(--teal-dark);font-size:13px;">' + esc(z.nom || '') + '</strong></div>';
+  html += '<div class="table-scroll"><table class="releve-table"><thead><tr><th class="th-equip">Équipement</th><th class="th-period">Périodicité</th>'
+    + heads.map(h => '<th class="th-day">' + esc(h) + '</th>').join('') + '</tr></thead><tbody>';
+  let zone = null;
+  (z.lignes || []).forEach(l => {
+    const zc = l.zone || '';
+    if (zc !== zone) {
+      zone = zc;
+      if (zc) html += '<tr><td colspan="' + (n + 2) + '" class="sec-hdr">' + esc(zc) + '</td></tr>';
+    }
+    const bio = l.nom === 'Produit BIO';
+    html += '<tr' + (bio ? ' class="bio-row"' : '') + '><td class="td-equip">' + esc(l.nom) + '</td><td class="td-period">' + esc(l.p || '') + '</td>';
+    for (let d = bi ? 0 : 1; d < (bi ? n : n + 1); d++) {
+      const on = dbJourCoche(l.jours, d);
+      const ph = l.ph && l.ph[String(d)];
+      html += '<td' + (bio ? ' style="background:var(--green-light)"' : '') + '>' + dbCase(on)
+        + (ph ? '<div style="font-size:8px;font-weight:700">' + esc(ph) + '</div>' : '') + '</td>';
+    }
+    html += '</tr>';
+  });
+  if (!(z.lignes || []).length) html += '<tr><td colspan="' + (n + 2) + '">Aucune ligne enregistrée.</td></tr>';
+  html += '</tbody></table></div>';
+  if (z.comment) html += '<div class="comment-box"><h3>📝 Anomalies & Commentaires</h3><textarea disabled>' + esc(z.comment) + '</textarea></div>';
+  return html;
+}
+function dbGrilleApp(a){
+  const neg = a.type === 'neg';
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const temps = neg ? TEMPS_NEG : TEMPS_MAT;
+  let html = '<div class="meta-row"><span style="font-size:14px;font-weight:700;color:' + (neg ? '#1565C0' : '#00695C') + '">' + (neg ? '❄️' : '🧪') + ' ' + esc(a.nom) + '</span>'
+    + '<label>Mois/Année :</label><input type="text" value="' + esc(a.mois || '') + '" disabled>'
+    + '<label>Visa :</label><input type="text" style="width:80px" value="' + esc(a.visa || '') + '" disabled></div>';
+  html += '<div class="meta-row" style="background:' + (neg ? '#FFF3E0' : '#E0F2F1') + '"><span style="font-size:12px;font-weight:700;color:' + (neg ? '#E65100' : '#004D40') + '">'
+    + (neg ? '✗ alerte ≥ −15°C &nbsp;|&nbsp; ✓ cible ≤ −18°C' : '✓ cible ≤ 4°C &nbsp;|&nbsp; ✗ alerte ≥ 6°C') + '</span></div>';
+  html += '<div class="table-scroll"><table class="temp-table"><thead>';
+  if (neg) {
+    html += '<tr style="background:#1565C0;color:#fff"><th class="t-label">T°</th>' + days.map(d => '<th colspan="2">' + d + '</th>').join('') + '</tr>';
+    html += '<tr style="background:#1976D2;color:#fff;font-size:8px"><th></th>' + days.map(() => '<th class="ampm-label">AM</th><th class="ampm-label">PM</th>').join('') + '</tr>';
+  } else {
+    html += '<tr style="background:#00695C;color:#fff"><th class="t-label" style="background:#004D40">T°</th>' + days.map(d => '<th>' + d + '</th>').join('') + '</tr>';
+  }
+  html += '</thead><tbody>';
+  temps.forEach(t => {
+    let cls, lbl;
+    if (neg) {
+      if (ALERT_NEG.has(t)) { cls = 'temp-alert'; lbl = '✗ ' + t + '°C'; }
+      else if (TARGET_NEG.has(t)) { cls = 'temp-ok'; lbl = '✓ ' + t + '°C'; }
+      else { cls = 'temp-warn'; lbl = t + '°C'; }
+    } else if (t >= 6) { cls = 'temp-alert'; lbl = '✗ ' + t + '°C'; }
+    else if (t <= 4) { cls = 'temp-ok'; lbl = '✓ ' + t + '°C'; }
+    else { cls = 'temp-warn'; lbl = t + '°C'; }
+    html += '<tr><td class="t-label ' + cls + '">' + lbl + '</td>';
+    days.forEach(d => {
+      const slots = neg ? ['AM', 'PM'] : [null];
+      slots.forEach(slot => {
+        html += '<td class="' + cls + '">' + dbCase(dbReleve(a, d, slot) === t) + '</td>';
+      });
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  if (a.comment) html += '<div class="comment-box"><h3>📝 Anomalies</h3><textarea disabled>' + esc(a.comment) + '</textarea></div>';
+  return html;
 }
 function dbPdf(){
-  const data = S.histoData && S.histoData[S.dbId];
   const meta = (S.histoList || []).find(x => x.id === S.dbId);
-  if (!data || !meta) { toast('Rien à imprimer', true); return; }
+  if (!meta) { toast('Rien à imprimer', true); return; }
+  if (meta.live) {
+    const now = new Date();
+    const noms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+    const label = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + ' – ' + noms[now.getMonth()] + ' (en cours)';
+    genererPdfCloture(label).catch(e => toast('❌ ' + e.message, true));
+    return;
+  }
+  const data = S.histoData && S.histoData[S.dbId];
+  if (!data) { toast('Rien à imprimer', true); return; }
   const bi = meta.type === 'bi';
-  const max = bi ? 12 : 31;
-  let body = '<h1>' + esc(meta.label) + '</h1><p>' + esc(meta.clotureLe || '') + '</p>';
+  let body = '';
   (data.zones || []).forEach(z => {
-    body += '<h2>' + esc(z.nom) + (z.visa ? ' — visa ' + esc(z.visa) : '') + '</h2><table><tr><th>Zone</th><th>Ligne</th><th>Coches</th></tr>';
-    (z.lignes || []).forEach(l => { body += '<tr><td>' + esc(l.zone) + '</td><td>' + esc(l.nom) + '</td><td>' + (l.jours || []).join(', ') + '</td></tr>'; });
-    body += '</table>';
+    body += '<div class="page-section"><div class="print-title">📋 ' + esc(z.nom || 'Zone') + ' — ' + esc(meta.label) + '</div>' + dbGrilleZone(z, bi) + '</div><div class="page-break"></div>';
   });
   if (!bi) (data.appareils || []).forEach(a => {
-    const jours = [];
-    for (let d = 1; d <= max; d++) { const t = dbPoint(a, d); if (t !== null) jours.push(d + ':' + t + '°'); }
-    body += '<h2>' + esc(a.nom) + '</h2><p>' + jours.join(' · ') + '</p>';
+    body += '<div class="page-section"><div class="print-title">' + (a.type === 'neg' ? '❄️' : '🧪') + ' ' + esc(a.nom) + ' — ' + esc(meta.label) + '</div>' + dbGrilleApp(a) + '</div><div class="page-break"></div>';
   });
-  const html = '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(meta.label) + '</title><style>body{font-family:sans-serif;font-size:11px}table{width:100%;border-collapse:collapse;margin-bottom:16px}td,th{border:1px solid #ccc;padding:3px 6px;text-align:left}h1{font-size:16px}h2{font-size:13px;color:#1B6B7B}</style></head><body>' + body + '<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>';
-  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-  if (!window.open(url, '_blank')) toast('⚠️ Popup bloqué', true);
+  if (!body) { toast('Aucune page à imprimer', true); return; }
+  ouvrirImpression(meta.label || 'Clôture', body);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4052,15 +4224,20 @@ async function confirmerCloture(){
     }else{res.style.background='#FFEBEE';res.style.color='#C62828';res.innerHTML='⚠️ '+(r.error||'Erreur');btn.disabled=false;btn.textContent='📤 Réessayer';}
   }catch(e){res.style.display='block';res.style.background='#FFEBEE';res.style.color='#C62828';res.innerHTML='❌ '+e.message;btn.disabled=false;btn.textContent='📤 Réessayer';}
 }
+function ouvrirImpression(label, body){
+  const css=document.querySelector('style').innerHTML;
+  const titre=String(label||'Clôture').replace(/'/g,'');
+  const fullHtml=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${esc(label)}</title><style>${css} body{background:#fff;font-size:11px;margin:0;} .topbar,.tabs,.tab-div,.progress-zone,.app-card-actions,.add-form,.inactive-title,.comment-box .btn,button,.btn,#toast,.meta-row button,.add-record-form,.alert-banner,.cloture-zone{display:none!important;} .print-title{font-size:13px;font-weight:700;color:#1B6B7B;padding:5px 0;border-bottom:2px solid #1B6B7B;margin-bottom:8px;} .page-break{page-break-after:always;} .page-section{padding:6mm;} .table-scroll,.records-table-wrap{overflow:visible!important;} .releve-table,.temp-table,.records-table{font-size:7px!important;width:100%!important;} .cb-wrap input[type=checkbox]{width:9px!important;height:9px!important;} .sec-hdr{font-size:8px!important;padding:2px 4px!important;} input[disabled],textarea[disabled]{color:#263238;opacity:1;-webkit-text-fill-color:#263238;} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page{size:A4 landscape;margin:6mm;}</style></head><body>${body}\x3cscript\x3edocument.title='${titre}';window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},2000);},600);};<\/script></body></html>`;
+  const blob=new Blob([fullHtml],{type:'text/html'}),url=URL.createObjectURL(blob),win=window.open(url,'_blank');
+  if(!win){const a=document.createElement('a');a.href=url;a.download=titre.replace(/[^a-zA-Z0-9\-]/g,'_')+'.html';a.click();toast('⚠️ Popup bloqué',true);}
+}
 async function genererPdfCloture(label){
-  const css=document.querySelector('style').innerHTML;let body='';
+  let body='';
   ['chaud','froid','autres'].forEach(tabId=>{body+=`<div class="page-section"><div class="print-title">📋 ${DATA[tabId].title} — ${label}</div>${buildHebdo(tabId)}</div><div class="page-break"></div>`;});
   S.appareils.filter(a=>a.actif).forEach(app=>{body+=`<div class="page-section"><div class="print-title">${typeMeta(app.type).emoji} ${esc(app.nom)} — ${label}</div>${app.type==='neg'?buildTempNeg(app):buildTempMat(app)}</div><div class="page-break"></div>`;});
   body+=`<div class="page-section"><div class="print-title">🔬 Prélèvements de surface — ${label}</div>${buildPrelevements()}</div><div class="page-break"></div>`;
   body+=`<div class="page-section"><div class="print-title">⚖️ Relevé des pesées — ${label}</div>${buildPesees()}</div>`;
-  const fullHtml=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>${label}</title><style>${css} body{background:#fff;font-size:11px;margin:0;} .topbar,.tabs,.tab-div,.progress-zone,.app-card-actions,.add-form,.inactive-title,.comment-box .btn,button,.btn,#toast,.meta-row button,.add-record-form,.alert-banner,.cloture-zone{display:none!important;} .print-title{font-size:13px;font-weight:700;color:#1B6B7B;padding:5px 0;border-bottom:2px solid #1B6B7B;margin-bottom:8px;} .page-break{page-break-after:always;} .page-section{padding:6mm;} .table-scroll,.records-table-wrap{overflow:visible!important;} .releve-table,.temp-table,.records-table{font-size:7px!important;width:100%!important;} .cb-wrap input[type=checkbox]{width:9px!important;height:9px!important;} .sec-hdr{font-size:8px!important;padding:2px 4px!important;} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page{size:A4 landscape;margin:6mm;}</style></head><body>${body}\x3cscript\x3edocument.title='${label}';window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},2000);},600);};<\/script></body></html>`;
-  const blob=new Blob([fullHtml],{type:'text/html'}),url=URL.createObjectURL(blob),win=window.open(url,'_blank');
-  if(!win){const a=document.createElement('a');a.href=url;a.download=label.replace(/[^a-zA-Z0-9\-]/g,'_')+'.html';a.click();toast('⚠️ Popup bloqué',true);}
+  ouvrirImpression(label, body);
 }
 
 function showCloturePrelev(){const now=new Date(),m=String(now.getMonth()+1).padStart(2,'0');document.getElementById('cloture-prelev-label').value=`${now.getFullYear()}-${m} – Prélèvements`;document.getElementById('cloture-prelev-result').style.display='none';document.getElementById('modal-cloture-prelev').style.display='flex';}
