@@ -583,7 +583,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div id="zones-body" class="zones-body"></div>
     <div class="zones-actions">
       <button class="btn" style="background:#E0F7FA;color:#1B6B7B" onclick="addZone()">➕ Zone</button>
-      <button class="btn" style="background:#FFF3E0;color:#E65100" onclick="resetZonesLayout()">↺ Liste d'origine</button>
       <button class="btn btn-primary" onclick="closeZonesEditor()">✓ Terminé</button>
     </div>
   </div>
@@ -596,7 +595,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <p class="zones-hint">Renommez les deux catégories proposées à la création d'un appareil (icône + nom). Les appareils déjà créés gardent toutes leurs données ; seule l'étiquette change.</p>
     <div id="types-body"></div>
     <div class="zones-actions">
-      <button class="btn" style="background:#FFF3E0;color:#E65100" onclick="resetTypes()">↺ Noms d'origine</button>
       <button class="btn btn-primary" onclick="saveTypes()">✓ Enregistrer</button>
     </div>
   </div>
@@ -1730,16 +1728,7 @@ function deleteZoneItem(si, ii){
   renderZonesEditor();
   toast('🗑 Ligne supprimée');
 }
-function resetZonesLayout(){
-  if (!ZONES_TAB || !LAYOUT) return;
-  if (!confirm('Restaurer les zones et machines d\'origine pour ce module ?\n\nLes noms personnalisés de ce module seront perdus.')) return;
-  const def = buildDefaultLayout().tabs[ZONES_TAB];
-  def.nextSlot = Math.max(def.nextSlot, Number(LAYOUT.tabs[ZONES_TAB].nextSlot) || 0);
-  LAYOUT.tabs[ZONES_TAB] = def;
-  persistLayout();
-  renderZonesEditor();
-  toast('↺ Liste d\'origine restaurée');
-}
+
 
 // ── Accès rapide aux zones depuis le menu Appareils ────────────────
 const ZONE_MODULE_LABELS = { chaud: 'Laboratoire Chaud', froid: 'Laboratoire Froid', autres: 'Autres zones', biannuel: 'Fréquences Bi-Annuelles' };
@@ -1815,15 +1804,6 @@ function saveTypes(){
   closeTypesEditor();
   if (S.tab === 'temp-manager') renderTab('temp-manager');
   toast('✅ Types renommés');
-}
-function resetTypes(){
-  if (!LAYOUT) return;
-  if (!confirm("Restaurer les noms d'origine des types d'appareils ?")) return;
-  LAYOUT.types = normalizeTypes(null);
-  persistLayout();
-  renderTypesEditor();
-  if (S.tab === 'temp-manager') renderTab('temp-manager');
-  toast("↺ Noms d'origine restaurés");
 }
 
 const MONTHS=['Jan','Fev','Mar','Avr','Mai','Juin','Juil','Août','Sept','Oct','Nov','Déc'];
@@ -3335,11 +3315,6 @@ function buildHebdo(tabId){
   const days=Array.from({length:31},(_,i)=>i+1);
   if(!S.checks[tabId])S.checks[tabId]={};
   if(!S.meta[tabId])S.meta[tabId]={month:new Date().toISOString().slice(0,7),visa:''};
-  let total=0,checked=0;
-  days.forEach(day=>{total++;if(S.checks[tabId]['BIO__'+day])checked++;});
-
-  d.sections.forEach(s=>s.items.forEach(it=>{days.forEach(day=>{total++;if(S.checks[tabId]['i'+it.slot+'__'+day])checked++;});}));
-  const pct=total>0?Math.round(checked/total*100):0;
   const todayD=new Date(),JOURS=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'],MOIS2=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
   const todayNum=todayD.getDate(),todayLabel=`${JOURS[todayD.getDay()]} ${todayNum} ${MOIS2[todayD.getMonth()]} ${todayD.getFullYear()}`;
   let html=`<div class="meta-row">
@@ -3348,11 +3323,6 @@ function buildHebdo(tabId){
     <strong style="color:var(--teal-dark);font-size:13px;">${d.title}</strong>
     <button class="btn btn-sm" style="background:#E0F7FA;color:var(--teal-dark);border:1px solid #B2EBF2" onclick="openZonesEditor('${tabId}')">🧩 Zones / machines</button>
     <span style="margin-left:auto;background:var(--orange-light);color:var(--orange);font-size:12px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid #FFCC80;">📅 Aujourd'hui : Jour ${todayNum} — ${todayLabel}</span>
-  </div>
-  <div class="progress-zone">
-    <div style="font-size:12px;font-weight:700;color:var(--teal-dark);margin-bottom:6px;">Progression du mois</div>
-    <div class="progress-bar"><div class="progress-fill" id="pb-${tabId}" style="width:${pct}%"></div></div>
-    <div class="progress-label" id="pl-${tabId}">${checked} / ${total} cases (${pct}%)</div>
   </div>
   <div class="table-scroll"><table class="releve-table">
     <thead><tr><th class="th-equip">Équipement</th><th class="th-period">Périodicité</th>
@@ -3384,15 +3354,7 @@ function buildHebdo(tabId){
 // ════════════════════════════════════════════════════════════════════
 function buildBiannuel(){
   const d=layoutData('biannuel');if(!S.checks['biannuel'])S.checks['biannuel']={};
-  let total=0,checked=0;
-  MONTHS.forEach((_,mi)=>{total++;if(S.checks['biannuel']['BIO__'+mi])checked++;});
-
-  d.sections.forEach(s=>s.items.forEach(it=>{MONTHS.forEach((_,mi)=>{total++;if(S.checks['biannuel']['i'+it.slot+'__'+mi])checked++;});}));
-  const pct=total>0?Math.round(checked/total*100):0;
   let html=`<div class="meta-row"><label>Année :</label><input type="number" value="${new Date().getFullYear()}" style="width:90px"><label>Visa :</label><input type="text" placeholder="Initiales" style="width:90px"><button class="btn btn-sm" style="background:#F3E5F5;color:#7B1FA2;border:1px solid #E1BEE7" onclick="openZonesEditor('biannuel')">🧩 Zones / machines</button></div>
-  <div class="progress-zone"><div style="font-size:12px;font-weight:700;color:var(--teal-dark);margin-bottom:6px;">Progression annuelle</div>
-    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-    <div class="progress-label">${checked} / ${total} cases (${pct}%)</div></div>
   <div class="table-scroll"><table class="releve-table"><thead><tr>
     <th class="th-equip">Équipement</th><th class="th-period">Périodicité</th>
     ${MONTHS.map(m=>`<th style="min-width:44px">${m}</th>`).join('')}
@@ -3423,17 +3385,51 @@ function buildBiannuel(){
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  PROGRESSION DES APPAREILS (par jour, pas par case)
+//  Congélateur : une journée est complète quand au moins une case AM
+//  ET une case PM sont cochées.  Cuve : une case par jour suffit.
+//  Les zones / machines du relevé n'ont plus de barre de progression.
+// ════════════════════════════════════════════════════════════════════
+function monthDayCount(ym){
+  if(!ym || !/^\d{4}-\d{2}$/.test(ym)) ym=new Date().toISOString().slice(0,7);
+  const p=ym.split('-');return new Date(Number(p[0]),Number(p[1]),0).getDate();
+}
+function appProgress(app){
+  const ck=S.appChecks[app.id]||{},meta=S.meta[app.id]||{};
+  const nb=monthDayCount(meta.moisAnnee);
+  let done=0;
+  if(app.type==='neg'){
+    for(let d=1;d<=nb;d++){
+      const am=TEMPS_NEG.some(t=>!!ck[t+'__'+d+'__AM']),pm=TEMPS_NEG.some(t=>!!ck[t+'__'+d+'__PM']);
+      if(am&&pm)done++;
+    }
+    return {done,total:nb,unit:'jours complets',hint:'1 case AM + 1 case PM par jour'};
+  }
+  for(let d=1;d<=nb;d++){if(TEMPS_MAT.some(t=>!!ck[t+'__'+d]))done++;}
+  return {done,total:nb,unit:'jours relevés',hint:'1 case par jour'};
+}
+function appProgHtml(app){
+  const p=appProgress(app),pct=p.total>0?Math.round(p.done/p.total*100):0;
+  return {pct,label:`${p.done}/${p.total} ${p.unit} (${pct}%) — ${p.hint}`};
+}
+function refreshAppProg(appId){
+  const app=S.appareils.find(a=>a.id===appId);if(!app)return;
+  const pg=appProgHtml(app);
+  const pb=document.getElementById('pb-app-'+appId);if(pb)pb.style.width=pg.pct+'%';
+  const pl=document.getElementById('pl-app-'+appId);if(pl)pl.textContent=pg.label;
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  BUILD TEMP NEG / MAT
 // ════════════════════════════════════════════════════════════════════
 function buildTempNeg(app){
   const key=app.id;if(!S.appChecks[key])S.appChecks[key]={};
   const meta=S.meta[key]||{};
-  const days=Array.from({length:31},(_,i)=>i+1);let total=0,checked=0;
-  TEMPS_NEG.forEach(t=>days.forEach(d=>['AM','PM'].forEach(slot=>{total++;if(S.appChecks[key][t+'__'+d+'__'+slot])checked++;})));
-  const pct=total>0?Math.round(checked/total*100):0;
+  const days=Array.from({length:31},(_,i)=>i+1);
+  const pg=appProgHtml(app),pct=pg.pct;
   let html=`<div class="meta-row"><span style="font-size:14px;font-weight:700;color:#1565C0">❄️ ${esc(app.nom)}</span><label>Mois/Année :</label><input type="month" value="${meta.moisAnnee||new Date().toISOString().slice(0,7)}" id="meta-m-${key}"><label>Visa :</label><input type="text" style="width:80px" id="meta-v-${key}" placeholder="Initiales" value="${esc(meta.visa||'')}"><button class="btn btn-primary btn-sm" onclick="saveAppMeta('${key}')">💾 Enregistrer</button></div>
   <div class="meta-row" style="background:#FFF3E0"><span style="font-size:12px;font-weight:700;color:#E65100">✗ alerte ≥ −15°C &nbsp;|&nbsp; ✓ cible ≤ −18°C</span></div>
-  <div class="progress-zone"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#1565C0"></div></div><div class="progress-label">${checked}/${total} (${pct}%)</div></div>
+  <div class="progress-zone"><div class="progress-bar"><div class="progress-fill" id="pb-app-${key}" style="width:${pct}%;background:#1565C0"></div></div><div class="progress-label" id="pl-app-${key}">${pg.label}</div></div>
   <div class="table-scroll"><table class="temp-table"><thead>
     <tr style="background:#1565C0;color:#fff"><th class="t-label">T°</th>${days.map(d=>`<th colspan="2" style="min-width:40px">${d}</th>`).join('')}</tr>
     <tr style="background:#1976D2;color:#fff;font-size:8px"><th></th>${days.map(()=>'<th class="ampm-label">AM</th><th class="ampm-label">PM</th>').join('')}</tr>
@@ -3451,12 +3447,11 @@ function buildTempNeg(app){
 function buildTempMat(app){
   const key=app.id;if(!S.appChecks[key])S.appChecks[key]={};
   const meta=S.meta[key]||{};
-  const days=Array.from({length:31},(_,i)=>i+1);let total=0,checked=0;
-  TEMPS_MAT.forEach(t=>days.forEach(d=>{total++;if(S.appChecks[key][t+'__'+d])checked++;}));
-  const pct=total>0?Math.round(checked/total*100):0;
+  const days=Array.from({length:31},(_,i)=>i+1);
+  const pg=appProgHtml(app),pct=pg.pct;
   let html=`<div class="meta-row"><span style="font-size:14px;font-weight:700;color:#00695C">🧪 ${esc(app.nom)}</span><label>Année/Mois :</label><input type="month" value="${meta.moisAnnee||new Date().toISOString().slice(0,7)}" id="meta-m-${key}"><label>Visa :</label><input type="text" style="width:80px" id="meta-v-${key}" placeholder="Initiales" value="${esc(meta.visa||'')}"><button class="btn btn-primary btn-sm" onclick="saveAppMeta('${key}')">💾 Enregistrer</button></div>
   <div class="meta-row" style="background:#E0F2F1"><span style="font-size:12px;font-weight:700;color:#004D40">✓ cible ≤ 4°C &nbsp;|&nbsp; ✗ alerte ≥ 6°C</span></div>
-  <div class="progress-zone"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#00695C"></div></div><div class="progress-label">${checked}/${total} (${pct}%)</div></div>
+  <div class="progress-zone"><div class="progress-bar"><div class="progress-fill" id="pb-app-${key}" style="width:${pct}%;background:#00695C"></div></div><div class="progress-label" id="pl-app-${key}">${pg.label}</div></div>
   <div class="table-scroll"><table class="temp-table"><thead><tr style="background:#00695C;color:#fff"><th class="t-label" style="background:#004D40">T°</th>${days.map(d=>`<th style="min-width:28px">${d}</th>`).join('')}</tr></thead><tbody>`;
   TEMPS_MAT.forEach(t=>{
     let cls,icon;if(t>=6){cls='temp-alert';icon='✗ ';}else if(t<=4){cls='temp-ok';icon='✓ ';}else{cls='temp-warn';icon='';}
@@ -3510,7 +3505,7 @@ async function tick(tabId,itemName,itemIdx,day,val){
   if(!S.checks[tabId])S.checks[tabId]={};
   const stateKey=itemName==='BIO'?'BIO__'+day:'i'+itemIdx+'__'+day;
   const backendKey=itemName==='BIO'?'BIO':'i'+itemIdx;
-  S.checks[tabId][stateKey]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][backendKey+'__'+day]=val;updateProg(tabId);toast(val?'✅ Coché':'☐ Décoché');
+  S.checks[tabId][stateKey]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][backendKey+'__'+day]=val;toast(val?'✅ Coché':'☐ Décoché');
   try{const r=await api('saveHebdo',{sheetName:SHEET_NAMES[tabId],itemName:backendKey,day,value:val});if(r&&!r.ok)toast('⚠️ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}
 }
 async function tickBi(itemIdx,monthIndex,val){
@@ -3525,14 +3520,14 @@ async function tickApp(appId,tempVal,day,slot,val){
   DATA_REV++;
   if(!S.appChecks[appId])S.appChecks[appId]={};
   const ck=slot?`${tempVal}__${day}__${slot}`:`${tempVal}__${day}`;
-  S.appChecks[appId][ck]=val;if(S.states['App_'+appId])S.states['App_'+appId][ck]=val;toast(val?'✅':'☐');
+  S.appChecks[appId][ck]=val;if(S.states['App_'+appId])S.states['App_'+appId][ck]=val;refreshAppProg(appId);toast(val?'✅':'☐');
   try{const r=await api('saveAppareilTemp',{appareilId:appId,tempVal,day,slot,value:val});if(r&&!r.ok)toast('⚠️ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}
 }
 function togglePh(cb,inputId){const el=document.getElementById(inputId);if(!el)return;el.style.display=cb.checked?'':'none';if(!cb.checked)el.value='';}
 async function savePh(tabId,idx,day,val){DATA_REV++;const key='ph__i'+idx+'__'+day;if(!S.checks[tabId])S.checks[tabId]={};S.checks[tabId][key]=val;if(S.states[SHEET_NAMES[tabId]])S.states[SHEET_NAMES[tabId]][key]=val;try{await api('saveHebdo',{sheetName:SHEET_NAMES[tabId],itemName:'ph__i'+idx,day,value:val});}catch(e){toast('❌ '+e.message,true);}}
 async function saveComment(tabId){DATA_REV++;const el=document.getElementById('cmt-'+tabId);if(!el)return;S.comments[tabId]=el.value;const sn=tabId==='biannuel'?'Fréquences Bi-Annuelles':SHEET_NAMES[tabId];if(S.states[sn])S.states[sn]._comment=el.value;try{await api('saveComment',{sheetName:sn,comment:el.value});toast('💾 Commentaire enregistré');}catch(e){toast('❌ '+e.message,true);}}
 async function saveAppComment(appId){DATA_REV++;const el=document.getElementById('cmt-app-'+appId);if(!el)return;S.comments['app_'+appId]=el.value;if(S.states['App_'+appId])S.states['App_'+appId]._comment=el.value;try{await api('saveAppareilComment',{appareilId:appId,comment:el.value});toast('💾 Enregistré');}catch(e){toast('❌ '+e.message,true);}}
-async function saveAppMeta(appId){DATA_REV++;const m=document.getElementById('meta-m-'+appId)?.value||'',v=document.getElementById('meta-v-'+appId)?.value||'';S.meta[appId]={moisAnnee:m,visa:v};if(S.states['App_'+appId]){S.states['App_'+appId]._month=m;S.states['App_'+appId]._visa=v;}try{await api('saveAppareilMeta',{appareilId:appId,moisAnnee:m,visa:v});toast('💾 Méta enregistrée');}catch(e){toast('❌ '+e.message,true);}}
+async function saveAppMeta(appId){DATA_REV++;const m=document.getElementById('meta-m-'+appId)?.value||'',v=document.getElementById('meta-v-'+appId)?.value||'';S.meta[appId]={moisAnnee:m,visa:v};if(S.states['App_'+appId]){S.states['App_'+appId]._month=m;S.states['App_'+appId]._visa=v;}refreshAppProg(appId);try{await api('saveAppareilMeta',{appareilId:appId,moisAnnee:m,visa:v});toast('💾 Méta enregistrée');}catch(e){toast('❌ '+e.message,true);}}
 async function ajouterAppareil(){const nom=document.getElementById('new-nom').value.trim(),type=document.getElementById('new-type').value;if(!nom){toast('⚠️ Entrez un nom',true);return;}try{const app=await api('addAppareil',{nom,type});S.appareils.push(app);document.getElementById('new-nom').value='';updateAppareilsTabs();renderTab('temp-manager');toast('✅ '+app.nom+' créé !');}catch(e){toast('❌ '+e.message,true);}}
 async function dupApp(id){try{const app=await api('dupliquerAppareil',{sourceId:id});S.appareils.push(app);updateAppareilsTabs();renderTab('temp-manager');toast('✅ Dupliqué : '+app.nom);}catch(e){toast('❌ '+e.message,true);}}
 function startRen(id){S.renaming[id]=true;renderTab('temp-manager');setTimeout(()=>document.getElementById('ren-'+id)?.focus(),50);}
@@ -3542,16 +3537,6 @@ async function delApp(id){const app=S.appareils.find(a=>a.id===id);if(!confirm('
 async function supprimerDefinitivement(id,nom){if(!confirm('⚠️ Supprimer définitivement "'+nom+'" ?\n\nACTION IRRÉVERSIBLE'))return;try{const r=await api('supprimerDefinitivement',{id});if(r.ok){S.appareils=S.appareils.filter(a=>a.id!==id);if(S.tab==='app_'+id)S.tab='temp-manager';S.loaded.delete('app_'+id);delete S.appChecks[id];updateAppareilsTabs();renderTab('temp-manager');toast('💀 Supprimé définitivement');}else toast('❌ '+r.error,true);}catch(e){toast('❌ '+e.message,true);}}
 async function reactApp(id){try{await api('reactiverAppareil',{id});const app=S.appareils.find(a=>a.id===id);if(app)app.actif=true;updateAppareilsTabs();renderTab('temp-manager');toast('♻️ Réactivé !');}catch(e){toast('❌ '+e.message,true);}}
 function goToApp(id){const el=document.querySelector(`[data-app-id="${id}"]`);if(el)el.click();else switchTab('app_'+id,null);}
-
-function updateProg(tabId){
-  const d=layoutData(tabId);if(!d)return;const days=Array.from({length:31},(_,i)=>i+1);let total=0,checked=0;
-
-  days.forEach(day=>{total++;if(S.checks[tabId]['BIO__'+day])checked++;});
-  d.sections.forEach(s=>s.items.forEach(it=>{days.forEach(day=>{total++;if(S.checks[tabId]['i'+it.slot+'__'+day])checked++;});}));
-  const pct=total>0?Math.round(checked/total*100):0;
-  const pb=document.getElementById('pb-'+tabId);if(pb)pb.style.width=pct+'%';
-  const pl=document.getElementById('pl-'+tabId);if(pl)pl.textContent=`${checked} / ${total} cases (${pct}%)`;
-}
 
 // ════════════════════════════════════════════════════════════════════
 //  UTILITAIRES
