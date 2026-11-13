@@ -3589,7 +3589,7 @@ function dbAppareils(data, live){
   const negatifs = choisis.filter(a => a.type === 'neg');
   const positifs = choisis.filter(a => a.type !== 'neg');
   let html = '<div class="db-card"><h3>🌡️ Courbes des températures' + (live ? ' — mois en cours' : '') + '</h3><div class="db-checks">' + checks + '</div>'
-    + '<p class="db-note">Même lecture que TEMPRO : un point par jour coché, un trou si le jour n’est pas relevé. Plusieurs cases le même jour : la température la plus haute est gardée. Le négatif trace le matin (trait plein) et l’après-midi (pointillés).</p></div>';
+    + '<p class="db-note">Un point par jour coché, un trou si le jour n’est pas relevé. Plusieurs cases le même jour : la température la plus haute est gardée. Le négatif trace le matin (trait plein) et l’après-midi (pointillés).</p></div>';
   if (!choisis.length) return html + '<div class="db-card">Cochez au moins un appareil pour afficher sa courbe.</div>';
   if (positifs.length) html += dbBlocCourbe('Positif et maturation', positifs, false);
   if (negatifs.length) html += dbBlocCourbe('Négatif', negatifs, true);
