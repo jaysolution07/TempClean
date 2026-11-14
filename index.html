@@ -448,6 +448,28 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 #boot-fill{height:100%;width:0;background:linear-gradient(90deg,#00796B,#26C6DA);transition:width .35s ease;}
 #boot-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #boot-detail{display:none;font-size:11.5px;line-height:1.55;color:#B71C1C;margin-top:12px;word-break:break-word;text-align:left;}
+/* ══ HACCP : analyses & non-conformités ══ */
+.haccp-badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap;}
+.haccp-badge.c{background:#E8F5E9;color:#2E7D32;}
+.haccp-badge.nc{background:#FFEBEE;color:#C62828;}
+.haccp-badge.att{background:#FFF8E1;color:#EF6C00;}
+.doc-chip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;background:#F3E5F5;border:1px solid #E1BEE7;border-radius:8px;padding:8px 10px;margin-top:6px;color:#4A148C;}
+.doc-chip a{color:#6A1B9A;font-weight:700;text-decoration:underline;}
+.bac-row{display:grid;grid-template-columns:1.5fr .6fr .9fr 1fr auto auto;gap:6px;align-items:center;margin-bottom:6px;}
+.bac-row input{border:1px solid #cfd8dc;border-radius:8px;padding:8px;font-size:13px;background:#fff;min-height:36px;width:100%;}
+.bac-row.bac-head span{font-size:11px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.3px;}
+@media(max-width:620px){.bac-row{grid-template-columns:1fr 1fr;}.bac-row.bac-head{display:none;}}
+.an-lignes-block{border:1px solid #D7EDEB;background:#F7FBFA;border-radius:10px;padding:12px;margin:14px 0;}
+.an-lignes-title{font-size:13px;font-weight:800;color:#00695C;margin-bottom:8px;}
+.an-lignes-hint{font-size:11px;font-weight:600;color:#78909c;margin-left:6px;}
+.an-ligne{display:grid;grid-template-columns:1.6fr .7fr .9fr 1fr 1fr 76px 40px;gap:6px;align-items:center;margin-bottom:6px;}
+.an-ligne input,.an-ligne select{border:1px solid #cfd8dc;border-radius:8px;padding:8px;font-size:12.5px;background:#fff;min-height:36px;width:100%;}
+.an-ligne.an-ligne-head span{font-size:10.5px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.3px;}
+.anl-cell{display:flex;flex-direction:column;gap:4px;}
+.an-bac-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;font-size:11.5px;}
+.an-bac-nom{font-weight:700;}
+.an-bac-res{color:#455A64;}
+@media(max-width:760px){.an-ligne{grid-template-columns:1fr 1fr;}.an-ligne.an-ligne-head{display:none;}}
 </style>
 </head>
 <body>
@@ -563,6 +585,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
       <div class="sidebar-item" data-tab="autres" onclick="sidebarNav('autres',this)"><span class="si-icon">🏭</span> <span id="sidelbl-autres">Autres zones</span></div>
       <div class="sidebar-section-title">Fréquences</div>
       <div class="sidebar-item" data-tab="biannuel" onclick="sidebarNav('biannuel',this)"><span class="si-icon">📅</span> <span id="sidelbl-biannuel">Fréquences Bi-Annuelles</span></div>
+      <div class="sidebar-section-title">HACCP</div>
+      <div class="sidebar-item" data-tab="analyses" onclick="sidebarNav('analyses',this)"><span class="si-icon">🧪</span> Analyses labo</div>
+      <div class="sidebar-item" data-tab="nonconformites" onclick="sidebarNav('nonconformites',this)"><span class="si-icon">⚠️</span> Non-conformités</div>
       <div class="sidebar-section-title">Relevés</div>
       <div class="sidebar-item" data-tab="prelevements" onclick="sidebarNav('prelevements',this)"><span class="si-icon">🔬</span> Prélèvements</div>
       <div class="sidebar-item" data-tab="pesees" onclick="sidebarNav('pesees',this)"><span class="si-icon">⚖️</span> Pesées</div>
@@ -597,6 +622,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div class="tab" data-tab="froid" onclick="switchTab('froid',this)">❄️ <span id="tablbl-froid">Froid</span></div>
     <div class="tab" data-tab="autres" onclick="switchTab('autres',this)">🏭 <span id="tablbl-autres">Autres</span></div>
     <div class="tab" data-tab="biannuel" onclick="switchTab('biannuel',this)">📅 <span id="tablbl-biannuel">Bi-Ann.</span></div>
+    <div class="tab" data-tab="analyses" onclick="switchTab('analyses',this)">🧪 Analyses</div>
+    <div class="tab" data-tab="nonconformites" onclick="switchTab('nonconformites',this)">⚠️ NC</div>
     <div class="tab" data-tab="prelevements" onclick="switchTab('prelevements',this)">🔬 Prélèv.</div>
     <div class="tab" data-tab="pesees" onclick="switchTab('pesees',this)">⚖️ Pesées</div>
     <div class="tab" data-tab="maintenance" onclick="switchTab('maintenance',this)">🛠️ Machines</div>
@@ -638,6 +665,18 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div id="types-body"></div>
     <div class="zones-actions">
       <button class="btn btn-primary" onclick="saveTypes()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Catalogue des bactéries / analyses types -->
+<div id="bacteries-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:760px">
+    <h2>🦠 Bactéries &amp; seuils</h2>
+    <p class="zones-hint">Chaque bactérie enregistrée apparaît dans la liste déroulante du formulaire d'analyse et remplit automatiquement l'unité, le critère et le seuil critique (PMS). Modifiez une valeur puis ✓ pour l'enregistrer.</p>
+    <div id="bacteries-body"></div>
+    <div class="zones-actions">
+      <button class="btn btn-primary" onclick="fermerBacteries()">✓ Terminé</button>
     </div>
   </div>
 </div>
@@ -1975,7 +2014,8 @@ const S = {
   appareils:[], renaming:{}, loaded:new Set(),
   prelevements:[], pesees:[], machines:[], maintenanceRows:[], maintenanceMachineId:'',
   editingReleve:null, editingPesee:null, editingMaintenance:null, editingFreezerId:null,
-  freezerItems:[], freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''}, freezerDraft:{produit:'',placements:[]}, freezerSearch:''
+  freezerItems:[], freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''}, freezerDraft:{produit:'',placements:[]}, freezerSearch:'',
+  analyses:[], nonConformites:[], editingAnalyse:null, editingNC:null, haccpErr:{}, bacteries:[]
 };
 let elogRows = [];
 let BOOTSTRAP_OK = true; // false si le backend ne connaît pas encore l'action 'bootstrap'
@@ -2124,6 +2164,7 @@ function switchTab(tab, el) {
   });
   if (tab==='elog') { renderElog(elogRows || []); return; }
   if (tab==='temp-manager') { renderTab(tab); return; }
+  if (tab==='analyses' || tab==='nonconformites') { openHaccpTab(tab); return; }
   if (pendingStateTab(tab)) { openStateTab(tab); return; }
   renderTab(tab);
 }
@@ -2149,6 +2190,8 @@ function ensureRecordsFetched(tab) {
       S.maintenanceRows = maintenanceRes.rows || [];
       if (!S.maintenanceMachineId && S.machines.length) S.maintenanceMachineId = S.machines[0].id;
     }
+    else if (tab === 'analyses') { const r = await api('loadAnalyses'); S.analyses = r.rows || []; }
+    else if (tab === 'nonconformites') { const r = await api('loadNonConformites'); S.nonConformites = r.rows || []; }
     else if (tab === 'freezer') {
       const r = await api('loadFreezerData');
       S.freezerItems = (r.items || []).map(normalizeFreezerItem);
@@ -2180,6 +2223,8 @@ function renderTab(tab) {
   else if (tab==='pesees') c.innerHTML=buildPesees();
   else if (tab==='maintenance') c.innerHTML=buildMaintenance();
   else if (tab==='freezer') c.innerHTML=buildFreezer();
+  else if (tab==='analyses') c.innerHTML=buildAnalyses();
+  else if (tab==='nonconformites') c.innerHTML=buildNonConformites();
   else if (tab==='dashboard') { openDashboard(); }
   else if (tab==='elog') { /* géré par loadElog */ }
   else if (tab.startsWith('app_')) {
@@ -3758,6 +3803,585 @@ function dbPdf(){
   });
   if (!body) { toast('Aucune page à imprimer', true); return; }
   ouvrirImpression(meta.label || 'Clôture', body);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HACCP — ANALYSES LABORATOIRE EXTERNES
+//  Données : suivi des analyses (labo externe) + document photo/PDF
+//  envoyé dans le Drive du compte Google du classeur.
+// ════════════════════════════════════════════════════════════════════
+let analyseDocDraft = null;   // { name, mime, data } choisi mais pas encore envoyé
+
+function todayFr(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(); }
+function analyseVide(){ return { _rowIndex:'', numero:'', date:'', produit:'', lot:'', contexte:'', probleme:'', actions:'', dateMiseOeuvre:'', document:'', lignes:[] }; }
+function analyseEnEdition(){ return (S.editingAnalyse!==null && S.analyses[S.editingAnalyse]) ? S.analyses[S.editingAnalyse] : null; }
+
+async function openHaccpTab(tab){
+  const c = document.getElementById('main-content');
+  const libelle = tab==='analyses' ? 'analyses' : 'non-conformités';
+  if (!S.loaded.has(tab)) {
+    c.innerHTML = '<div class="loading"><div class="spinner"></div><span>Chargement des ' + libelle + '…</span></div>';
+    try {
+      const r = tab==='analyses'
+        ? await api('loadAnalyses', {}, { attempts:1, timeout:40000 })
+        : await api('loadNonConformites', {}, { attempts:1, timeout:40000 });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'Lecture impossible');
+      if (tab==='analyses') S.analyses = r.rows || [];
+      else S.nonConformites = r.rows || [];
+      if (tab==='analyses' && !S.loaded.has('bacteries')) {
+        try {
+          const rb = await api('loadBacteries', {}, { attempts:1, timeout:30000 });
+          if (rb && rb.ok !== false) { S.bacteries = rb.rows || []; S.loaded.add('bacteries'); }
+        } catch (e) {}
+      }
+      delete S.haccpErr[tab];
+      S.loaded.add(tab);
+    } catch (e) {
+      S.haccpErr[tab] = e.message || 'Lecture impossible';
+    }
+  }
+  if (S.tab === tab) renderTab(tab);
+}
+function haccpErreur(tab){
+  if (!S.haccpErr || !S.haccpErr[tab]) return '';
+  return '<div class="alert-banner info">⚠️ Données non lues : ' + esc(S.haccpErr[tab]) + '<br><button class="btn btn-sm" style="margin-top:8px" onclick="S.loaded.delete(\'' + tab + '\');openHaccpTab(\'' + tab + '\')">🔄 Réessayer</button></div>';
+}
+
+// ── Modèle : une analyse (en-tête + document) et ses lignes de bactéries ──
+function ligneAnalyseVide(){ return { typeAnalyse:'', unites:'', criteres:'', seuils:'', resultat:'', resultatCNC:'' }; }
+function statutAnalyse(a){
+  const ls = (a && a.lignes) || [];
+  if (ls.some(l => String(l.resultatCNC||'').toUpperCase()==='NC')) return 'NC';
+  if (ls.some(l => String(l.resultatCNC||'').toUpperCase()==='C')) return 'C';
+  return '';
+}
+
+function buildAnalyses(){
+  const rows = S.analyses || [];
+  const nc = rows.filter(r => statutAnalyse(r)==='NC').length;
+  const nbBac = rows.reduce((n,r) => n + ((r.lignes||[]).length), 0);
+  let html = `<div class="releve-page-header">
+    <div><div class="releve-title">🧪 Analyses laboratoire externes</div><div class="releve-subtitle">Un prélèvement, plusieurs bactéries analysées et un seul document (photo ou PDF)</div></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" style="background:#F3E5F5;color:#6A1B9A;border:1px solid #E1BEE7" onclick="ouvrirBacteries()">🦠 Bactéries &amp; seuils</button>
+      <span class="releve-count">${rows.length} analyse${rows.length>1?'s':''} · ${nbBac} bactérie${nbBac>1?'s':''}</span>
+    </div>
+  </div>`;
+  html += haccpErreur('analyses');
+  if (nc>0) html += `<div class="alert-banner info">⚠️ ${nc} analyse${nc>1?'s':''} avec au moins une bactérie non conforme</div>`;
+  html += buildAnalyseForm();
+  html += `<div class="records-table-wrap">`;
+  if (!rows.length) html += `<div class="records-empty">Aucune analyse enregistrée.</div>`;
+  else {
+    html += `<div class="table-scroll"><table class="records-table"><thead><tr>
+      <th style="width:44px">N°</th><th>Date prélèv.</th><th>Produit</th><th>Lot</th><th>Contexte</th>
+      <th>Bactéries analysées</th><th style="width:60px">C/NC</th>
+      <th>Description du problème</th><th>Étude de causes / actions</th>
+      <th style="width:90px">Mise en œuvre</th><th style="width:54px">Doc.</th><th style="width:80px">Actions</th>
+    </tr></thead><tbody>`;
+    rows.forEach((row,idx) => { html += buildAnalyseRow(row,idx); });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function buildAnalyseForm(){
+  const cur = analyseEnEdition();
+  const a = cur || analyseVide();
+  const edit = !!cur;
+  const doc = a.document || '';
+  return `<div class="add-record-form"><h3>${edit ? '✏️ Modifier l\'analyse N° ' + esc(String(a.numero)) : '➕ Ajouter une analyse'}</h3>
+  <div class="form-grid">
+    <div class="form-group"><label>Date de prélèvement *</label><input type="text" id="an-date" placeholder="JJ/MM/AAAA" value="${esc(a.date || (edit?'':todayFr()))}"></div>
+    <div class="form-group"><label>Produit</label><input type="text" id="an-produit" value="${esc(a.produit)}" placeholder="Ex: P1"></div>
+    <div class="form-group"><label>Lot</label><input type="text" id="an-lot" value="${esc(a.lot)}" placeholder="Ex: 101"></div>
+    <div class="form-group"><label>Contexte</label><input type="text" id="an-contexte" value="${esc(a.contexte)}" placeholder="Ex: début de prod"></div>
+  </div>
+  ${buildLignesAnalyse(a.lignes)}
+  <div class="form-grid">
+    <div class="form-group full"><label>Description du problème</label><textarea id="an-probleme" rows="2" placeholder="Décrire le problème constaté...">${esc(a.probleme)}</textarea></div>
+    <div class="form-group full"><label>Étude de causes / actions correctives / amélioration</label><textarea id="an-actions" rows="2" placeholder="Analyse des causes et actions menées...">${esc(a.actions)}</textarea></div>
+    <div class="form-group"><label>Date de mise en œuvre</label><input type="text" id="an-mise" value="${esc(a.dateMiseOeuvre)}" placeholder="JJ/MM/AAAA"></div>
+    <div class="form-group full"><label>Document (photo ou PDF) — un seul document pour toutes les bactéries, enregistré dans le Drive</label>
+      <input type="file" id="an-doc" accept="image/*,application/pdf" onchange="analyseDocChoisi(this)">
+      <div id="an-doc-info" class="doc-chip" style="display:none"></div>
+      ${doc ? `<div class="doc-chip">📄 Document joint : <a href="${esc(doc)}" target="_blank" rel="noopener">ouvrir le document</a>
+        <button class="btn btn-sm" style="margin-left:auto;background:#FFEBEE;color:#C62828" onclick="retirerDocAnalyse()">🗑 Retirer</button></div>` : ''}
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" onclick="enregistrerAnalyse(this)">💾 ${edit?'Mettre à jour':'Enregistrer'}</button>
+    ${edit
+      ? `<button class="btn" style="background:#f5f5f5;color:#555" onclick="annulerEditAnalyse()">✕ Annuler</button>`
+      : `<button class="btn" style="background:#f5f5f5;color:#555" onclick="viderFormAnalyse()">🗑 Effacer</button>`}
+  </div></div>`;
+}
+
+// ── Éditeur des bactéries d'une analyse ──────────────────────────────
+function buildLignesAnalyse(lignes){
+  const list = (lignes && lignes.length) ? lignes : [ligneAnalyseVide()];
+  return `<div class="an-lignes-block">
+    <div class="an-lignes-title">Bactéries analysées *<span class="an-lignes-hint">choisissez la bactérie : unité, critère et seuil PMS se remplissent seuls</span></div>
+    <div class="an-ligne an-ligne-head"><span>Bactérie / type</span><span>Unités</span><span>Critères</span><span>Seuils PMS</span><span>Résultat</span><span>C/NC</span><span></span></div>
+    <div id="an-lignes-rows">${lignesRowsHtml(list)}</div>
+    <div style="margin-top:8px"><button type="button" class="btn btn-sm" style="background:#E0F2F1;color:#00695C" onclick="ajouterLigneAnalyse()">➕ Ajouter une bactérie</button></div>
+  </div>`;
+}
+
+function lignesRowsHtml(list){
+  return list.map((l,i) => {
+    const nom = String(l.typeAnalyse || '');
+    const connue = (S.bacteries || []).some(x => String(x.nom) === nom);
+    const sel = connue ? nom : (nom ? '__autre' : '');
+    const opts = [['','—'],['C','C'],['NC','NC']]
+      .map(([v,t]) => `<option value="${v}"${String(l.resultatCNC||'')===v?' selected':''}>${t}</option>`).join('');
+    const lock = connue ? ' readonly style="background:#F1F8E9"' : '';
+    return `<div class="an-ligne" data-ligne="${i}">
+      <div class="anl-cell">
+        <select id="anl-type-select-${i}" onchange="analyseLigneTypeChange(${i}, this.value)">${bacterieOptions(sel)}</select>
+        <input type="text" id="anl-type-${i}" value="${esc(nom)}" placeholder="Type d'analyse" style="${sel==='__autre'?'':'display:none'}">
+      </div>
+      <input type="text" id="anl-unites-${i}" value="${esc(l.unites)}" placeholder="UFC/g"${lock}>
+      <input type="text" id="anl-criteres-${i}" value="${esc(l.criteres)}" placeholder="&lt;10"${lock}>
+      <input type="text" id="anl-seuils-${i}" value="${esc(l.seuils)}" placeholder="5000 UFC/g"${lock}>
+      <input type="text" id="anl-resultat-${i}" value="${esc(l.resultat)}" placeholder="Valeur mesurée">
+      <select id="anl-cnc-${i}">${opts}</select>
+      <button type="button" class="btn-row-del" title="Retirer cette bactérie" onclick="supprimerLigneAnalyse(${i})">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function renderLignesAnalyse(list){
+  const box = document.getElementById('an-lignes-rows');
+  if (box) box.innerHTML = lignesRowsHtml(list);
+}
+
+function lireLignesAnalyse(){
+  const rows = [...document.querySelectorAll('#an-lignes-rows .an-ligne')];
+  return rows.map((r,i) => {
+    const val = id => { const el = document.getElementById('anl-' + id + '-' + i); return el ? String(el.value||'').trim() : ''; };
+    return { typeAnalyse: val('type'), unites: val('unites'), criteres: val('criteres'),
+      seuils: val('seuils'), resultat: val('resultat'), resultatCNC: val('cnc') };
+  });
+}
+
+function ajouterLigneAnalyse(){
+  const list = lireLignesAnalyse();
+  list.push(ligneAnalyseVide());
+  renderLignesAnalyse(list);
+}
+
+function supprimerLigneAnalyse(i){
+  const list = lireLignesAnalyse();
+  if (list.length <= 1) { renderLignesAnalyse([ligneAnalyseVide()]); return; }
+  list.splice(i,1);
+  renderLignesAnalyse(list);
+}
+
+// Changement de bactérie sur une ligne : unité / critère / seuil verrouillés
+function analyseLigneTypeChange(i, v){
+  const libre = document.getElementById('anl-type-' + i);
+  const b = (S.bacteries || []).find(x => String(x.nom) === String(v));
+  const champ = id => document.getElementById('anl-' + id + '-' + i);
+  if (b) {
+    if (libre) { libre.value = b.nom; libre.style.display = 'none'; }
+    const u = champ('unites'); if (u) u.value = b.unites || '';
+    const c = champ('criteres'); if (c) c.value = b.criteres || '';
+    const s = champ('seuils'); if (s) s.value = b.seuils || '';
+    verrouillerLigne(i, true);
+    return;
+  }
+  verrouillerLigne(i, false);
+  ['unites','criteres','seuils'].forEach(id => { const el = champ(id); if (el) el.value = ''; });
+  if (!libre) return;
+  if (v === '__autre') { libre.style.display = ''; libre.value = ''; libre.focus(); }
+  else { libre.style.display = 'none'; libre.value = ''; }
+}
+
+function verrouillerLigne(i, verrou){
+  ['unites','criteres','seuils'].forEach(id => {
+    const el = document.getElementById('anl-' + id + '-' + i);
+    if (!el) return;
+    el.readOnly = !!verrou;
+    el.style.background = verrou ? '#F1F8E9' : '#fff';
+  });
+}
+
+function lireFormAnalyse(){
+  const v = id => { const el=document.getElementById(id); return el ? String(el.value||'').trim() : ''; };
+  return { date:v('an-date'), produit:v('an-produit'), lot:v('an-lot'), contexte:v('an-contexte'),
+    probleme:v('an-probleme'), actions:v('an-actions'), dateMiseOeuvre:v('an-mise'),
+    lignes: lireLignesAnalyse().filter(l => l.typeAnalyse || l.unites || l.criteres || l.seuils || l.resultat || l.resultatCNC) };
+}
+
+function analyseDocChoisi(input){
+  analyseDocDraft = null;
+  const info = document.getElementById('an-doc-info');
+  if (info) { info.style.display='none'; info.innerHTML=''; }
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (f.size > 8*1024*1024) { input.value=''; toast('⚠️ Document trop lourd (max 8 Mo)', true); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = String(reader.result||'');
+    analyseDocDraft = { name:f.name, mime:f.type||'application/octet-stream', data:dataUrl.slice(dataUrl.indexOf(',')+1) };
+    if (info) {
+      info.style.display='flex';
+      info.innerHTML = '📎 ' + esc(f.name) + ' (' + (f.size/1024/1024).toFixed(1) + ' Mo) — sera enregistré dans le Drive avec l\'analyse';
+    }
+  };
+  reader.onerror = () => toast('❌ Lecture du fichier impossible', true);
+  reader.readAsDataURL(f);
+}
+
+async function enregistrerAnalyse(btn){
+  const d = lireFormAnalyse();
+  if (!d.date) { toast('⚠️ La date de prélèvement est obligatoire', true); return; }
+  if (!d.lignes.length || !d.lignes.some(l => l.typeAnalyse)) { toast('⚠️ Ajoutez au moins une bactérie analysée', true); return; }
+  const cur = analyseEnEdition();
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enregistrement…'; }
+  try {
+    if (analyseDocDraft) {
+      const up = await api('uploadAnalyseDocument', analyseDocDraft, { attempts:1, timeout:120000 });
+      if (!up || !up.ok) throw new Error((up && up.error) || 'Envoi du document impossible');
+      d.document = up.url || '';
+    }
+    if (cur) {
+      if (!d.document) d.document = cur.document || '';
+      const maj = Object.assign({}, cur, d);
+      const r = await api('updateAnalyse', maj);
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+      const i = S.analyses.indexOf(cur);
+      if (i >= 0) S.analyses[i] = maj;
+      S.editingAnalyse = null;
+      toast('✅ Analyse mise à jour');
+    } else {
+      const r = await api('addAnalyse', d);
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+      S.analyses.push(Object.assign({}, analyseVide(), d, { _rowIndex:r._rowIndex, numero:r.numero || '' }));
+      toast('✅ Analyse enregistrée');
+    }
+    analyseDocDraft = null;
+    renderTab('analyses');
+    window.scrollTo({ top:0, behavior:'smooth' });
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = cur ? '💾 Mettre à jour' : '💾 Enregistrer'; }
+  }
+}
+
+function startEditAnalyse(idx){ S.editingAnalyse = idx; analyseDocDraft = null; renderTab('analyses'); window.scrollTo({ top:0, behavior:'smooth' }); }
+function annulerEditAnalyse(){ S.editingAnalyse = null; analyseDocDraft = null; renderTab('analyses'); }
+function viderFormAnalyse(){
+  analyseDocDraft = null;
+  ['an-produit','an-lot','an-contexte','an-probleme','an-actions','an-mise'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const date = document.getElementById('an-date'); if (date) date.value = todayFr();
+  renderLignesAnalyse([ligneAnalyseVide()]);
+  const info = document.getElementById('an-doc-info'); if (info) { info.style.display='none'; info.innerHTML=''; }
+}
+
+async function retirerDocAnalyse(){
+  const cur = analyseEnEdition();
+  if (!cur) return;
+  if (!confirm('Retirer le document de cette analyse ?')) return;
+  try {
+    const maj = Object.assign({}, cur, { document:'' });
+    const r = await api('updateAnalyse', maj);
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    const i = S.analyses.indexOf(cur); if (i >= 0) S.analyses[i] = maj;
+    renderTab('analyses'); toast('🗑 Document retiré');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+async function supprimerAnalyse(idx){
+  const row = S.analyses[idx];
+  if (!row) return;
+  if (!confirm('Supprimer l\'analyse' + (row.numero ? ' N° ' + row.numero : '') + ' et ses ' + ((row.lignes||[]).length) + ' bactérie(s) ?')) return;
+  try {
+    if (row._rowIndex !== '' && row._rowIndex !== undefined) {
+      const r = await api('deleteAnalyse', { _rowIndex: row._rowIndex, numero: row.numero });
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    }
+    S.analyses.splice(idx,1);
+    if (S.editingAnalyse === idx) S.editingAnalyse = null;
+    renderTab('analyses'); toast('🗑 Analyse supprimée');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+function buildAnalyseRow(row,idx){
+  const st = statutAnalyse(row);
+  const badge = st==='C' ? '<span class="haccp-badge c">C</span>' : st==='NC' ? '<span class="haccp-badge nc">NC</span>' : '—';
+  const doc = row.document ? `<a href="${esc(row.document)}" target="_blank" rel="noopener" title="Ouvrir le document">📄</a>` : '—';
+  const lignes = row.lignes || [];
+  const bacs = lignes.length ? lignes.map(l => {
+    const s = String(l.resultatCNC||'').toUpperCase();
+    const b = s==='C' ? '<span class="haccp-badge c">C</span>' : s==='NC' ? '<span class="haccp-badge nc">NC</span>' : '';
+    const titre = [l.unites ? 'Unité : ' + l.unites : '', l.criteres ? 'Critère : ' + l.criteres : '', l.seuils ? 'Seuil PMS : ' + l.seuils : ''].filter(Boolean).join(' · ');
+    return `<div class="an-bac-line" title="${esc(titre)}">`
+      + '<span class="an-bac-nom">' + esc(l.typeAnalyse || '—') + '</span>'
+      + (l.resultat ? '<span class="an-bac-res">' + esc(l.resultat) + '</span>' : '') + b + '</div>';
+  }).join('') : '—';
+  return `<tr>
+    <td style="text-align:center;font-weight:700">${esc(String(row.numero||''))}</td>
+    <td>${fmtDisplayDate(row.date)}</td>
+    <td style="font-weight:600">${esc(row.produit)}</td>
+    <td>${esc(row.lot)}</td>
+    <td>${esc(row.contexte)}</td>
+    <td style="min-width:210px">${bacs}</td>
+    <td style="text-align:center">${badge}</td>
+    <td style="max-width:170px;word-break:break-word">${esc(row.probleme)}</td>
+    <td style="max-width:190px;word-break:break-word">${esc(row.actions)}</td>
+    <td>${fmtDisplayDate(row.dateMiseOeuvre)}</td>
+    <td style="text-align:center">${doc}</td>
+    <td class="td-actions-col"><button class="btn-row-edit" onclick="startEditAnalyse(${idx})">✏️</button> <button class="btn-row-del" onclick="supprimerAnalyse(${idx})">🗑</button></td>
+  </tr>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HACCP — SUIVI DES NON-CONFORMITÉS
+//  Même logique que les analyses, sans document joint.
+// ════════════════════════════════════════════════════════════════════
+function ncVide(){ return { _rowIndex:'', numero:'', typeNC:'', date:'', donneurAlerte:'', description:'', criticite:'', actionImmediate:'', actions:'', dateMiseOeuvre:'', efficacite:'', recidive:'' }; }
+function ncEnEdition(){ return (S.editingNC!==null && S.nonConformites[S.editingNC]) ? S.nonConformites[S.editingNC] : null; }
+
+function buildNonConformites(){
+  const rows = S.nonConformites || [];
+  const critiques = rows.filter(r => Number(r.criticite) >= 7).length;
+  const recidives = rows.filter(r => /^(oui|o|x|true)$/i.test(String(r.recidive||'').trim())).length;
+  let html = `<div class="releve-page-header">
+    <div><div class="releve-title">⚠️ Suivi des non-conformités</div><div class="releve-subtitle">Alerte, criticité, actions correctives, efficacité et récidive</div></div>
+    <span class="releve-count">${rows.length} non-conformité${rows.length>1?'s':''}</span>
+  </div>`;
+  html += haccpErreur('nonconformites');
+  if (critiques>0) html += `<div class="alert-banner info">🚨 ${critiques} non-conformité${critiques>1?'s':''} de criticité ≥ 7${recidives>0?' · '+recidives+' récidive'+(recidives>1?'s':''):''}</div>`;
+  else if (recidives>0) html += `<div class="alert-banner info">🔁 ${recidives} récidive${recidives>1?'s':''} enregistrée${recidives>1?'s':''}</div>`;
+  html += buildNcForm();
+  html += `<div class="records-table-wrap">`;
+  if (!rows.length) html += `<div class="records-empty">Aucune non-conformité enregistrée.</div>`;
+  else {
+    html += `<div class="table-scroll"><table class="records-table"><thead><tr>
+      <th style="width:44px">N°</th><th>Type NC</th><th>Date</th><th>Donneur d'alerte</th><th>Description</th>
+      <th style="width:86px">Criticité</th><th>Action immédiate</th><th>Étude de causes / actions correctives</th>
+      <th style="width:90px">Mise en œuvre</th><th>Efficacité</th><th style="width:80px">Récidive</th><th style="width:80px">Actions</th>
+    </tr></thead><tbody>`;
+    rows.forEach((row,idx) => { html += buildNcRow(row,idx); });
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function buildNcForm(){
+  const cur = ncEnEdition();
+  const n = cur || ncVide();
+  const edit = !!cur;
+  const crits = ['','1','2','3','4','5','6','7','8','9']
+    .map(v => `<option value="${v}"${String(n.criticite||'')===v?' selected':''}>${v===''?'—':v+' / 9'}</option>`).join('');
+  const recs = [['','—'],['non','Non'],['oui','Oui']]
+    .map(([v,l]) => `<option value="${v}"${String(n.recidive||'').toLowerCase()===v?' selected':''}>${l}</option>`).join('');
+  return `<div class="add-record-form"><h3>${edit ? '✏️ Modifier la non-conformité N° ' + esc(String(n.numero)) : '➕ Ajouter une non-conformité'}</h3>
+  <div class="form-grid">
+    <div class="form-group"><label>Type NC</label><input type="text" id="nc-type" value="${esc(n.typeNC)}" placeholder="Ex: df, RC"></div>
+    <div class="form-group"><label>Date *</label><input type="text" id="nc-date" placeholder="JJ/MM/AAAA" value="${esc(n.date || (edit?'':todayFr()))}"></div>
+    <div class="form-group"><label>Donneur d'alerte</label><input type="text" id="nc-donneur" value="${esc(n.donneurAlerte)}" placeholder="Ex: employé 1"></div>
+    <div class="form-group"><label>Criticité (1 à 9)</label><select id="nc-crit">${crits}</select></div>
+    <div class="form-group"><label>Date de mise en œuvre</label><input type="text" id="nc-mise" value="${esc(n.dateMiseOeuvre)}" placeholder="JJ/MM/AAAA"></div>
+    <div class="form-group"><label>Efficacité</label><input type="text" id="nc-efficacite" value="${esc(n.efficacite)}" placeholder="Ex: contrôle du mois suivant"></div>
+    <div class="form-group"><label>Récidive</label><select id="nc-recidive">${recs}</select></div>
+    <div class="form-group full"><label>Description *</label><textarea id="nc-description" rows="2" placeholder="Décrire la non-conformité...">${esc(n.description)}</textarea></div>
+    <div class="form-group full"><label>Action immédiate</label><textarea id="nc-immediate" rows="2" placeholder="Action faite sur le champ...">${esc(n.actionImmediate)}</textarea></div>
+    <div class="form-group full"><label>Étude de causes / actions correctives</label><textarea id="nc-actions" rows="2" placeholder="Causes identifiées et actions correctives...">${esc(n.actions)}</textarea></div>
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary" onclick="enregistrerNc(this)">💾 ${edit?'Mettre à jour':'Enregistrer'}</button>
+    ${edit
+      ? `<button class="btn" style="background:#f5f5f5;color:#555" onclick="annulerEditNc()">✕ Annuler</button>`
+      : `<button class="btn" style="background:#f5f5f5;color:#555" onclick="viderFormNc()">🗑 Effacer</button>`}
+  </div></div>`;
+}
+
+function lireFormNc(){
+  const v = id => { const el=document.getElementById(id); return el ? String(el.value||'').trim() : ''; };
+  return { typeNC:v('nc-type'), date:v('nc-date'), donneurAlerte:v('nc-donneur'), criticite:v('nc-crit'),
+    actionImmediate:v('nc-immediate'), description:v('nc-description'), actions:v('nc-actions'),
+    dateMiseOeuvre:v('nc-mise'), efficacite:v('nc-efficacite'), recidive:v('nc-recidive') };
+}
+
+async function enregistrerNc(btn){
+  const d = lireFormNc();
+  if (!d.date) { toast('⚠️ La date est obligatoire', true); return; }
+  if (!d.description) { toast('⚠️ La description est obligatoire', true); return; }
+  const cur = ncEnEdition();
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enregistrement…'; }
+  try {
+    if (cur) {
+      const maj = Object.assign({}, cur, d);
+      const r = await api('updateNonConformite', maj);
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+      const i = S.nonConformites.indexOf(cur);
+      if (i >= 0) S.nonConformites[i] = maj;
+      S.editingNC = null;
+      toast('✅ Non-conformité mise à jour');
+    } else {
+      const r = await api('addNonConformite', d);
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+      S.nonConformites.push(Object.assign({}, ncVide(), d, { _rowIndex:r._rowIndex, numero:r.numero || '' }));
+      toast('✅ Non-conformité enregistrée');
+    }
+    renderTab('nonconformites');
+    window.scrollTo({ top:0, behavior:'smooth' });
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = cur ? '💾 Mettre à jour' : '💾 Enregistrer'; }
+  }
+}
+
+function startEditNc(idx){ S.editingNC = idx; renderTab('nonconformites'); window.scrollTo({ top:0, behavior:'smooth' }); }
+function annulerEditNc(){ S.editingNC = null; renderTab('nonconformites'); }
+function viderFormNc(){ ['nc-type','nc-donneur','nc-description','nc-immediate','nc-actions','nc-mise','nc-efficacite'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); const c=document.getElementById('nc-crit'); if(c)c.value=''; const r=document.getElementById('nc-recidive'); if(r)r.value=''; }
+
+async function supprimerNc(idx){
+  const row = S.nonConformites[idx];
+  if (!row) return;
+  if (!confirm('Supprimer cette non-conformité' + (row.numero ? ' (N° ' + row.numero + ')' : '') + ' ?')) return;
+  try {
+    if (row._rowIndex !== '' && row._rowIndex !== undefined) {
+      const r = await api('deleteNonConformite', { _rowIndex: row._rowIndex });
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    }
+    S.nonConformites.splice(idx,1);
+    if (S.editingNC === idx) S.editingNC = null;
+    renderTab('nonconformites'); toast('🗑 Non-conformité supprimée');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+function criticiteBadge(v){
+  const n = Number(v);
+  if (!v || isNaN(n)) return '—';
+  const cls = n >= 7 ? 'nc' : (n >= 4 ? 'att' : 'c');
+  return `<span class="haccp-badge ${cls}">${n} / 9</span>`;
+}
+function recidiveBadge(v){
+  const s = String(v||'').trim();
+  if (!s) return '—';
+  return /^(oui|o|x|true)$/i.test(s) ? '<span class="haccp-badge nc">Oui</span>' : '<span class="haccp-badge c">Non</span>';
+}
+function buildNcRow(row,idx){
+  return `<tr>
+    <td style="text-align:center;font-weight:700">${esc(String(row.numero||''))}</td>
+    <td>${esc(row.typeNC)}</td>
+    <td>${fmtDisplayDate(row.date)}</td>
+    <td>${esc(row.donneurAlerte)}</td>
+    <td style="max-width:220px;word-break:break-word">${esc(row.description)}</td>
+    <td style="text-align:center">${criticiteBadge(row.criticite)}</td>
+    <td style="max-width:180px;word-break:break-word">${esc(row.actionImmediate)}</td>
+    <td style="max-width:200px;word-break:break-word">${esc(row.actions)}</td>
+    <td>${fmtDisplayDate(row.dateMiseOeuvre)}</td>
+    <td>${esc(row.efficacite)}</td>
+    <td style="text-align:center">${recidiveBadge(row.recidive)}</td>
+    <td class="td-actions-col"><button class="btn-row-edit" onclick="startEditNc(${idx})">✏️</button> <button class="btn-row-del" onclick="supprimerNc(${idx})">🗑</button></td>
+  </tr>`;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  HACCP — CATALOGUE DES BACTÉRIES / ANALYSES TYPES
+//  Chaque bactérie pré-enregistrée propose son nom dans le formulaire
+//  d'analyse et remplit l'unité, le critère et le seuil critique (PMS).
+// ════════════════════════════════════════════════════════════════════
+function bacterieOptions(sel){
+  const liste = S.bacteries || [];
+  let html = '<option value="">— choisir une bactérie —</option>';
+  liste.forEach(b => {
+    html += '<option value="' + esc(b.nom) + '"' + (String(sel) === String(b.nom) ? ' selected' : '') + '>' + esc(b.nom) + '</option>';
+  });
+  html += '<option value="__autre"' + (sel === '__autre' ? ' selected' : '') + '>➕ Autre (saisie libre)</option>';
+  return html;
+}
+
+// ── Éditeur des bactéries (modal) ───────────────────────────────────
+function ouvrirBacteries(){ renderBacteries(); document.getElementById('bacteries-modal').style.display = 'flex'; }
+function fermerBacteries(){ document.getElementById('bacteries-modal').style.display = 'none'; }
+
+function renderBacteries(){
+  const body = document.getElementById('bacteries-body');
+  if (!body) return;
+  const liste = S.bacteries || [];
+  let html = '<div class="bac-row bac-head"><span>Bactérie / analyse</span><span>Unité</span><span>Critère</span><span>Seuil critique (PMS)</span><span></span><span></span></div>';
+  if (!liste.length) {
+    html += '<p style="font-size:12.5px;color:#78909c;line-height:1.5;margin:6px 0 12px">Aucune bactérie enregistrée pour l\'instant. Ajoutez ci-dessous les analyses que votre laboratoire réalise : leur nom apparaîtra ensuite dans la liste déroulante du formulaire, avec l\'unité, le critère et le seuil critique (PMS) déjà remplis.</p>';
+  }
+  liste.forEach((b, i) => {
+    html += '<div class="bac-row">'
+      + '<input type="text" id="bac-nom-' + i + '" value="' + esc(b.nom) + '" placeholder="Nom de la bactérie">'
+      + '<input type="text" id="bac-unites-' + i + '" value="' + esc(b.unites) + '" placeholder="UFC/g">'
+      + '<input type="text" id="bac-crit-' + i + '" value="' + esc(b.criteres) + '" placeholder="<10">'
+      + '<input type="text" id="bac-seuils-' + i + '" value="' + esc(b.seuils) + '" placeholder="5000 UFC/g">'
+      + '<button class="btn-row-save" title="Enregistrer" onclick="enregistrerBacterie(' + i + ')">✓</button>'
+      + '<button class="btn-row-del" title="Supprimer" onclick="supprimerBacterie(' + i + ')">🗑</button>'
+      + '</div>';
+  });
+  html += '<div class="bac-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed #d5d5d5">'
+    + '<input type="text" id="bac-nom-new" placeholder="Nouvelle bactérie">'
+    + '<input type="text" id="bac-unites-new" placeholder="UFC/g">'
+    + '<input type="text" id="bac-crit-new" placeholder="<10">'
+    + '<input type="text" id="bac-seuils-new" placeholder="5000 UFC/g">'
+    + '<button class="btn-row-save" title="Ajouter" onclick="ajouterBacterie()">➕</button>'
+    + '<span></span>'
+    + '</div>';
+  body.innerHTML = html;
+}
+
+function rafraichirSelectBacteries(){
+  if (!document.getElementById('an-lignes-rows')) return;
+  renderLignesAnalyse(lireLignesAnalyse());
+}
+
+async function ajouterBacterie(){
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const nom = v('bac-nom-new'), unites = v('bac-unites-new'), criteres = v('bac-crit-new'), seuils = v('bac-seuils-new');
+  if (!nom) { toast('⚠️ Le nom de la bactérie est obligatoire', true); return; }
+  if ((S.bacteries || []).some(b => String(b.nom).toLowerCase() === nom.toLowerCase())) { toast('⚠️ Cette bactérie existe déjà', true); return; }
+  try {
+    const r = await api('addBacterie', { nom, unites, criteres, seuils });
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    S.bacteries.push({ _rowIndex:r._rowIndex, nom, unites, criteres, seuils });
+    renderBacteries();
+    rafraichirSelectBacteries();
+    toast('✅ Bactérie ajoutée');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+async function enregistrerBacterie(i){
+  const b = (S.bacteries || [])[i];
+  if (!b) return;
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const maj = { _rowIndex:b._rowIndex, nom:v('bac-nom-' + i), unites:v('bac-unites-' + i), criteres:v('bac-crit-' + i), seuils:v('bac-seuils-' + i) };
+  if (!maj.nom) { toast('⚠️ Le nom de la bactérie est obligatoire', true); return; }
+  try {
+    const r = await api('updateBacterie', maj);
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    S.bacteries[i] = maj;
+    renderBacteries();
+    rafraichirSelectBacteries();
+    toast('✅ Bactérie mise à jour');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+async function supprimerBacterie(i){
+  const b = (S.bacteries || [])[i];
+  if (!b) return;
+  if (!confirm('Supprimer « ' + b.nom + ' » de la liste ?\n\nLes analyses déjà enregistrées ne sont pas modifiées.')) return;
+  try {
+    if (b._rowIndex !== '' && b._rowIndex !== undefined) {
+      const r = await api('deleteBacterie', { _rowIndex:b._rowIndex });
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    }
+    S.bacteries.splice(i, 1);
+    renderBacteries();
+    rafraichirSelectBacteries();
+    toast('🗑 Bactérie supprimée');
+  } catch (e) { toast('❌ ' + e.message, true); }
 }
 
 // ════════════════════════════════════════════════════════════════════
