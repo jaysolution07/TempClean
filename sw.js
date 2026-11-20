@@ -1,14 +1,14 @@
 // ════════════════════════════════════════════════════════════════════
-//  TempClean — Service Worker
-//  ⚠️ Change VERSION à chaque déploiement → force la MàJ sur tous les appareils
+// TempClean — Service Worker
+// ⚠️ Change VERSION à chaque déploiement → force la MàJ sur tous les appareils
 // ════════════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.0.0'; // ← INCRÉMENTER À CHAQUE PUSH (v2.0.1, v2.1.0...)
+const VERSION = 'v2.1.0'; // ← INCRÉMENTER À CHAQUE PUSH (v2.0.1, v2.1.0...)
 const CACHE_NAME = 'tempclean-' + VERSION;
 
 const ASSETS = [
   './',
-  './tempclean.html',
+  './index.html',
   './logo.png'
 ];
 
@@ -16,8 +16,8 @@ const ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting()) // ← Active immédiatement sans attendre
+      .then(cache => Promise.all(ASSETS.map(url => cache.add(url).catch(() => null))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -27,10 +27,10 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME) // supprime tout sauf la version actuelle
+          .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       ))
-      .then(() => self.clients.claim()) // prend contrôle de tous les onglets ouverts
+      .then(() => self.clients.claim())
   );
 });
 
@@ -39,18 +39,19 @@ self.addEventListener('activate', event => {
 // Fallback cache uniquement si hors-ligne
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('script.google.com')) return; // GAS jamais en cache
+  const url = event.request.url;
+  if (url.includes('script.google.com') || url.includes('googleapis.com')) return;
 
   event.respondWith(
     fetch(event.request)
       .then(resp => {
-        if (resp && resp.status === 200) {
+        if (resp && resp.status === 200 && new URL(url).origin === self.location.origin) {
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return resp;
       })
-      .catch(() => caches.match(event.request)) // hors-ligne → cache
+      .catch(() => caches.match(event.request))
   );
 });
 

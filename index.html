@@ -470,6 +470,18 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
 .an-bac-nom{font-weight:700;}
 .an-bac-res{color:#455A64;}
 @media(max-width:760px){.an-ligne{grid-template-columns:1fr 1fr;}.an-ligne.an-ligne-head{display:none;}}
+/* ══ ÉTIQUETTES DLC / DDM ══ */
+.etq-wrap{display:grid;grid-template-columns:minmax(320px,1.15fr) minmax(240px,.85fr);gap:16px;align-items:start;}
+@media(max-width:900px){.etq-wrap{grid-template-columns:1fr;}}
+.etq-preview-panel{background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:12px;}
+.etq-preview-title{font-size:12px;font-weight:700;color:#37474f;margin-bottom:8px;}
+.etq-preview-scroll{overflow:auto;padding:10px;background:#f5f5f5;border-radius:8px;display:flex;justify-content:center;}
+.etq-preview{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.18);box-sizing:border-box;outline:1px dashed #b0bec5;}
+.etq-hint{font-size:11.5px;color:#78909c;line-height:1.45;margin-top:10px;}
+.prod-row{display:grid;grid-template-columns:1.4fr .55fr .5fr 1.1fr 1.1fr auto auto;gap:6px;align-items:center;margin-bottom:6px;}
+.prod-row input,.prod-row select{border:1px solid #cfd8dc;border-radius:8px;padding:8px;font-size:12.5px;background:#fff;min-height:36px;width:100%;}
+.prod-row.prod-head span{font-size:10.5px;font-weight:700;color:#607D8B;text-transform:uppercase;letter-spacing:.3px;}
+@media(max-width:700px){.prod-row{grid-template-columns:1fr 1fr;}.prod-row.prod-head{display:none;}}
 </style>
 </head>
 <body>
@@ -588,6 +600,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
       <div class="sidebar-section-title">HACCP</div>
       <div class="sidebar-item" data-tab="analyses" onclick="sidebarNav('analyses',this)"><span class="si-icon">🧪</span> Analyses labo</div>
       <div class="sidebar-item" data-tab="nonconformites" onclick="sidebarNav('nonconformites',this)"><span class="si-icon">⚠️</span> Non-conformités</div>
+      <div class="sidebar-item" data-tab="etiquettes" onclick="sidebarNav('etiquettes',this)"><span class="si-icon">🏷️</span> Étiquettes DLC</div>
       <div class="sidebar-section-title">Relevés</div>
       <div class="sidebar-item" data-tab="prelevements" onclick="sidebarNav('prelevements',this)"><span class="si-icon">🔬</span> Prélèvements</div>
       <div class="sidebar-item" data-tab="pesees" onclick="sidebarNav('pesees',this)"><span class="si-icon">⚖️</span> Pesées</div>
@@ -624,6 +637,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div class="tab" data-tab="biannuel" onclick="switchTab('biannuel',this)">📅 <span id="tablbl-biannuel">Bi-Ann.</span></div>
     <div class="tab" data-tab="analyses" onclick="switchTab('analyses',this)">🧪 Analyses</div>
     <div class="tab" data-tab="nonconformites" onclick="switchTab('nonconformites',this)">⚠️ NC</div>
+    <div class="tab" data-tab="etiquettes" onclick="switchTab('etiquettes',this)">🏷️ Étiquettes</div>
     <div class="tab" data-tab="prelevements" onclick="switchTab('prelevements',this)">🔬 Prélèv.</div>
     <div class="tab" data-tab="pesees" onclick="switchTab('pesees',this)">⚖️ Pesées</div>
     <div class="tab" data-tab="maintenance" onclick="switchTab('maintenance',this)">🛠️ Machines</div>
@@ -677,6 +691,39 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#333;font-
     <div id="bacteries-body"></div>
     <div class="zones-actions">
       <button class="btn btn-primary" onclick="fermerBacteries()">✓ Terminé</button>
+    </div>
+  </div>
+</div>
+
+<!-- Étiquettes : catalogue produits -->
+<div id="produitsetq-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:840px">
+    <h2>📦 Produits &amp; durées de vie</h2>
+    <p class="zones-hint">Chaque produit pré-remplit le nom, la durée, la conservation et les mentions. La date DLC/DDM est calculée automatiquement à partir de la date de fabrication. Modifiez une valeur puis ✓ pour l'enregistrer.</p>
+    <div id="produitsetq-body"></div>
+    <div class="zones-actions">
+      <button class="btn btn-primary" onclick="fermerProduitsEtiquettes()">✓ Terminé</button>
+    </div>
+  </div>
+</div>
+
+<!-- Étiquettes : format & calibrage -->
+<div id="etqconf-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:600px">
+    <h2>⚙️ Format &amp; calibrage</h2>
+    <p class="zones-hint">Choisissez le format de vos étiquettes. Les décalages corrigent une impression décalée sur votre imprimante ; ce réglage est propre à ce poste et ne coûte rien.</p>
+    <div class="form-grid">
+      <div class="form-group full"><label>Format d'étiquette</label><select id="etqc-preset" onchange="etqPresetChange(this.value)"></select></div>
+      <div class="form-group"><label>Largeur (mm)</label><input type="text" id="etqc-w"></div>
+      <div class="form-group"><label>Hauteur (mm)</label><input type="text" id="etqc-h"></div>
+      <div class="form-group"><label>Décalage X (mm)</label><input type="text" id="etqc-ox"></div>
+      <div class="form-group"><label>Décalage Y (mm)</label><input type="text" id="etqc-oy"></div>
+      <div class="form-group"><label>Taille du texte (%)</label><input type="text" id="etqc-police"></div>
+    </div>
+    <div class="zones-actions" style="flex-wrap:wrap">
+      <button class="btn" style="background:#FFF8E1;color:#EF6C00" onclick="imprimerMire()">📐 Mire de test</button>
+      <button class="btn" style="background:#eee;color:#333" onclick="fermerEtqConf()">Annuler</button>
+      <button class="btn btn-primary" onclick="etqEnregistrerConf()">✓ Enregistrer</button>
     </div>
   </div>
 </div>
@@ -960,7 +1007,7 @@ function logout() {
   if (gate) gate.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   // Reset état
-  Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:''});
+  Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:'',analyses:[],nonConformites:[],bacteries:[],haccpErr:{}});
   S.histoList = null; S.histoData = {}; S.dbId = ''; S.dbVue = 'zones';
   elogRows = [];
   BOOT_LOGS = null;
@@ -1262,9 +1309,9 @@ function startCreep(from, to, label) {
   }, 400);
   return { stop() { clearInterval(id); } };
 }
+const PACK_MODULES = ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer','analyses','nonconformites','bacteries'];
 function packReady() {
-  return ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer']
-    .every(t => S.loaded.has(t));
+  return PACK_MODULES.every(t => S.loaded.has(t));
 }
 async function callWithRetry(run, tries) {
   let last;
@@ -1289,6 +1336,9 @@ function restorePackCache(cached) {
     S.freezerMeta = Object.assign({dateDebut:'',dateFin:'',filtreRack:''}, cached.freezerMeta || {});
     S.loaded.add('freezer');
   }
+  if (Array.isArray(cached.analyses)) { S.analyses = cached.analyses; S.loaded.add('analyses'); }
+  if (Array.isArray(cached.nonConformites)) { S.nonConformites = cached.nonConformites; S.loaded.add('nonconformites'); }
+  if (Array.isArray(cached.bacteries)) { S.bacteries = cached.bacteries; S.loaded.add('bacteries'); }
 }
 function rememberPack() {
   saveCache({
@@ -1300,7 +1350,10 @@ function rememberPack() {
     machines: S.machines || [],
     maintenance: S.maintenanceRows || [],
     freezerItems: S.freezerItems || [],
-    freezerMeta: S.freezerMeta || {}
+    freezerMeta: S.freezerMeta || {},
+    analyses: S.analyses || [],
+    nonConformites: S.nonConformites || [],
+    bacteries: S.bacteries || []
   });
 }
 function applyPack(r) {
@@ -1334,6 +1387,9 @@ function applyPack(r) {
     S.freezerMeta = Object.assign({dateDebut:'',dateFin:'',filtreRack:''}, r.freezerMeta || {});
     S.loaded.add('freezer');
   }
+  if (Array.isArray(r.analyses)) { S.analyses = r.analyses; S.loaded.add('analyses'); }
+  if (Array.isArray(r.nonConformites)) { S.nonConformites = r.nonConformites; S.loaded.add('nonconformites'); }
+  if (Array.isArray(r.bacteries)) { S.bacteries = r.bacteries; S.loaded.add('bacteries'); }
   rememberPack();
 }
 function finishPaint() {
@@ -1388,11 +1444,12 @@ async function preloadStepByStep(sid) {
       if (!a || a.ok === false || !b || b.ok === false) throw new Error('Machines');
       applyPack({ machines: a.rows || [], maintenance: b.rows || [] });
     }],
-    ['Congélateur', 76, 90, async () => {
+    ['Congélateur', 76, 86, async () => {
       const r = await callWithRetry(() => api('loadFreezerData', {}, { attempts: 1, timeout: 40000 }), 3);
       if (!r || r.ok === false) throw new Error('Congélateur');
       applyPack({ freezerItems: r.items || [], freezerMeta: r.meta || {} });
-    }]
+    }],
+    ['Analyses et non-conformités', 86, 96, async () => { await loadHaccpPack(); }]
   ];
   for (let i = 0; i < steps.length; i++) {
     if (sid !== SESSION_ID) return false;
@@ -1403,7 +1460,7 @@ async function preloadStepByStep(sid) {
     setLoadProgress(steps[i][2], steps[i][0]);
   }
   if (sid !== SESSION_ID) return false;
-  const journal = startCreep(90, 98, 'Journal…');
+  const journal = startCreep(96, 98, 'Journal…');
   try { await loadJournal(); } catch (e) {}
   finally { journal.stop(); }
   return packReady();
@@ -1450,10 +1507,18 @@ async function preloadAll() {
         applyPack(r);
         if (!(await waitSnapshot(sid))) return false;
       } else applyPack(r);
+      if (!S.loaded.has('analyses') || !S.loaded.has('nonconformites') || !S.loaded.has('bacteries')) {
+        const haccp = startCreep(92, 98, 'Analyses et non-conformités…');
+        try { await loadHaccpPack(); }
+        catch (e) {
+          LOAD_FAIL = 'Analyses et non-conformités : ' + (e.message || 'lecture impossible');
+          return false;
+        } finally { haccp.stop(); }
+      }
       if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
       if (sid !== SESSION_ID) return false;
       if (!packReady()) {
-        const miss = ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer'].filter(t => !S.loaded.has(t));
+        const miss = PACK_MODULES.filter(t => !S.loaded.has(t));
         LOAD_FAIL = 'modules non chargés : ' + miss.join(', ');
         return false;
       }
@@ -1466,6 +1531,17 @@ async function preloadAll() {
   PRELOAD = job;
   job.finally(() => { if (PRELOAD === job) PRELOAD = null; });
   return job;
+}
+async function loadHaccpPack() {
+  const [a, n, b] = await Promise.all([
+    callWithRetry(() => api('loadAnalyses', {}, { attempts: 1, timeout: 40000 }), 2),
+    callWithRetry(() => api('loadNonConformites', {}, { attempts: 1, timeout: 40000 }), 2),
+    callWithRetry(() => api('loadBacteries', {}, { attempts: 1, timeout: 30000 }), 2)
+  ]);
+  if (!a || a.ok === false) throw new Error((a && a.error) || 'Analyses');
+  if (!n || n.ok === false) throw new Error((n && n.error) || 'Non-conformités');
+  if (!b || b.ok === false) throw new Error((b && b.error) || 'Bactéries');
+  applyPack({ analyses: a.rows || [], nonConformites: n.rows || [], bacteries: b.rows || [] });
 }
 function runSyncLoop() { return preloadAll(); }
 function retrySync() { preloadAll(); }
@@ -2015,7 +2091,7 @@ const S = {
   prelevements:[], pesees:[], machines:[], maintenanceRows:[], maintenanceMachineId:'',
   editingReleve:null, editingPesee:null, editingMaintenance:null, editingFreezerId:null,
   freezerItems:[], freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''}, freezerDraft:{produit:'',placements:[]}, freezerSearch:'',
-  analyses:[], nonConformites:[], editingAnalyse:null, editingNC:null, haccpErr:{}, bacteries:[]
+  analyses:[], nonConformites:[], editingAnalyse:null, editingNC:null, haccpErr:{}, bacteries:[], produitsEtiquettes:[], etqErr:''
 };
 let elogRows = [];
 let BOOTSTRAP_OK = true; // false si le backend ne connaît pas encore l'action 'bootstrap'
@@ -2165,6 +2241,7 @@ function switchTab(tab, el) {
   if (tab==='elog') { renderElog(elogRows || []); return; }
   if (tab==='temp-manager') { renderTab(tab); return; }
   if (tab==='analyses' || tab==='nonconformites') { openHaccpTab(tab); return; }
+  if (tab==='etiquettes') { openEtiquettes(); return; }
   if (pendingStateTab(tab)) { openStateTab(tab); return; }
   renderTab(tab);
 }
@@ -2225,6 +2302,7 @@ function renderTab(tab) {
   else if (tab==='freezer') c.innerHTML=buildFreezer();
   else if (tab==='analyses') c.innerHTML=buildAnalyses();
   else if (tab==='nonconformites') c.innerHTML=buildNonConformites();
+  else if (tab==='etiquettes') c.innerHTML=buildEtiquettes();
   else if (tab==='dashboard') { openDashboard(); }
   else if (tab==='elog') { /* géré par loadElog */ }
   else if (tab.startsWith('app_')) {
@@ -4381,6 +4459,426 @@ async function supprimerBacterie(i){
     renderBacteries();
     rafraichirSelectBacteries();
     toast('🗑 Bactérie supprimée');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ÉTIQUETTES DLC / DDM
+//  Impression 100 % gratuite et universelle : la page d'impression est au
+//  format exact de l'étiquette (mm, marge 0) et passe par le pilote de
+//  l'imprimante. Aucun logiciel, licence ou service à payer.
+// ════════════════════════════════════════════════════════════════════
+const ETQ_CFG_KEY = 'tc_etiquettes_cfg';
+const ETQ_PRESETS = [
+  { id:'50x30',   n:'50 × 30 mm — rouleau courant',              w:50,  h:30 },
+  { id:'60x40',   n:'60 × 40 mm',                                 w:60,  h:40 },
+  { id:'70x37',   n:'70 × 37 mm — planche A4 (24 poses)',         w:70,  h:37 },
+  { id:'100x50',  n:'100 × 50 mm',                                w:100, h:50 },
+  { id:'100x150', n:'100 × 150 mm — carton / palette',            w:100, h:150 },
+  { id:'29x62',   n:'29 × 62 mm — Brother DK-11209',              w:29,  h:62 },
+  { id:'62x100',  n:'62 × 100 mm — Brother QL rouleau continu',   w:62,  h:100 },
+  { id:'89x36',   n:'89 × 36 mm — Dymo 99012',                    w:89,  h:36 },
+  { id:'54x101',  n:'54 × 101 mm — Dymo 11354',                   w:54,  h:101 }
+];
+
+const ETQ_LABEL_CSS = `
+.etq-lbl{width:100%;height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:.5mm;font-family:Arial,Helvetica,sans-serif;color:#000;overflow:hidden;}
+.etq-nom{font-weight:800;line-height:1.05;text-transform:uppercase;letter-spacing:.1mm;word-break:break-word;}
+.etq-ligne{display:flex;align-items:baseline;gap:1.4mm;}
+.etq-lab{font-weight:700;font-size:2mm;text-transform:uppercase;}
+.etq-val{font-weight:800;}
+.etq-cond{line-height:1.15;font-weight:600;}
+.etq-code{margin-top:auto;padding-top:.6mm;}
+.etq-code svg{width:100%;height:auto;display:block;}
+.etq-code-txt{font-size:1.9mm;letter-spacing:.3mm;text-align:center;font-weight:700;}
+`;
+
+(function etqInjectCss(){
+  try {
+    const st = document.createElement('style');
+    st.id = 'etq-label-css';
+    st.textContent = ETQ_LABEL_CSS;
+    document.head.appendChild(st);
+  } catch (e) {}
+})();
+
+function etqNum(v, def){ const n = Number(String(v === undefined ? '' : v).replace(',', '.')); return isFinite(n) && n > 0 ? n : def; }
+function etqDefaut(){ return { preset:'50x30', w:50, h:30, ox:2, oy:2, police:100 }; }
+function etqCfg(){
+  try {
+    const raw = localStorage.getItem(ETQ_CFG_KEY);
+    if (raw) return Object.assign(etqDefaut(), JSON.parse(raw));
+  } catch (e) {}
+  return etqDefaut();
+}
+function etqSaveCfg(cfg){ try { localStorage.setItem(ETQ_CFG_KEY, JSON.stringify(cfg)); } catch (e) {} }
+
+function etqDateFr(d){ const p = n => String(n).padStart(2,'0'); return p(d.getDate()) + '/' + p(d.getMonth()+1) + '/' + d.getFullYear(); }
+function etqParseFr(s){
+  const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(d.getTime()) ? null : d;
+}
+function etqAjouteJours(s, n){
+  const d = etqParseFr(s);
+  if (!d || !n) return '';
+  d.setDate(d.getDate() + Number(n));
+  return etqDateFr(d);
+}
+
+// ── Code 39 : table officielle (9 éléments, 3 larges par caractère) ──
+const ETQ_C39_ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%';
+const ETQ_C39_ENC = [
+  0x034,0x121,0x061,0x160,0x031,0x130,0x070,0x025,0x124,0x064,
+  0x109,0x049,0x148,0x019,0x118,0x058,0x00D,0x10C,0x04C,0x01C,
+  0x103,0x043,0x142,0x013,0x112,0x052,0x007,0x106,0x046,0x016,
+  0x181,0x0C1,0x1C0,0x091,0x190,0x0D0,0x085,0x184,0x0C4,0x0A8,
+  0x0A2,0x08A,0x02A
+];
+const ETQ_C39_STAR = 0x094;
+function etqCode39Svg(texte, hauteurMm){
+  const brut = String(texte || '').toUpperCase().replace(/[^0-9A-Z\-. $/+%]/g, '');
+  if (!brut) return '';
+  const large = 2.5, etroit = 1, garde = 10 * etroit;
+  const chars = ('*' + brut + '*').split('');
+  const rects = [];
+  let x = garde;
+  chars.forEach((ch, ci) => {
+    const enc = ch === '*' ? ETQ_C39_STAR : ETQ_C39_ENC[ETQ_C39_ALPHA.indexOf(ch)];
+    if (enc === undefined || enc < 0) return;
+    for (let i = 0; i < 9; i++) {
+      const estBarre = (i % 2) === 0;
+      const l = ((enc >> (8 - i)) & 1) ? large : etroit;
+      if (estBarre) rects.push('<rect x="' + x.toFixed(3) + '" y="0" width="' + l.toFixed(3) + '" height="100"/>');
+      x += l;
+    }
+    if (ci < chars.length - 1) x += etroit;
+  });
+  const total = x + garde;
+  const h = Math.max(4, Number(hauteurMm) || 8);
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total.toFixed(3) + ' 100" preserveAspectRatio="none" '
+    + 'style="width:100%;height:' + h.toFixed(2) + 'mm" shape-rendering="crispEdges">' + rects.join('') + '</svg>';
+}
+
+// ── Chargement du module ─────────────────────────────────────────────
+async function openEtiquettes(){
+  const c = document.getElementById('main-content');
+  if (!S.loaded.has('etiquettes')) {
+    if (c) c.innerHTML = '<div class="loading"><div class="spinner"></div><span>Chargement des étiquettes…</span></div>';
+    try {
+      const r = await api('loadProduitsEtiquettes', {}, { attempts:1, timeout:30000 });
+      if (r && r.ok !== false) { S.produitsEtiquettes = r.rows || []; S.etqErr = ''; S.loaded.add('etiquettes'); }
+      else S.etqErr = (r && r.error) || 'Lecture impossible';
+    } catch (e) {
+      S.etqErr = e.message || 'Lecture impossible';
+    }
+  }
+  if (S.tab === 'etiquettes') renderTab('etiquettes');
+}
+
+function etqProduit(nom){ return (S.produitsEtiquettes || []).find(p => String(p.nom) === String(nom)) || null; }
+
+function buildEtiquettes(){
+  const cfg = etqCfg();
+  const produits = S.produitsEtiquettes || [];
+  const opts = ['<option value="">— choisir un produit —</option>']
+    .concat(produits.map(p => '<option value="' + esc(p.nom) + '">' + esc(p.nom) + '</option>'))
+    .concat(['<option value="__libre">➕ Autre (saisie libre)</option>']).join('');
+  let html = `<div class="releve-page-header">
+    <div><div class="releve-title">🏷️ Étiquettes DLC / DDM</div><div class="releve-subtitle">Édition, aperçu à l'échelle réelle et impression sur n'importe quelle imprimante d'étiquettes</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-sm" style="background:#E8F5E9;color:#2E7D32;border:1px solid #C8E6C9" onclick="ouvrirProduitsEtiquettes()">📦 Produits</button>
+      <button class="btn btn-sm" style="background:#FFF8E1;color:#EF6C00;border:1px solid #FFE0B2" onclick="ouvrirEtqConf()">⚙️ Format &amp; calibrage</button>
+      <span class="releve-count">${cfg.w} × ${cfg.h} mm</span>
+    </div>
+  </div>`;
+  if (S.etqErr) html += `<div class="alert-banner info">⚠️ Produits non lus : ${esc(S.etqErr)}<br><button class="btn btn-sm" style="margin-top:8px" onclick="S.loaded.delete('etiquettes');openEtiquettes()">🔄 Réessayer</button></div>`;
+  html += `<div class="etq-wrap">
+    <div class="add-record-form" style="margin:0">
+      <h3>✏️ Contenu de l'étiquette</h3>
+      <div class="form-grid">
+        <div class="form-group full"><label>Produit *</label>
+          <select id="etq-produit" onchange="etqProduitChange(this.value)">${opts}</select>
+          <input type="text" id="etq-produit-libre" placeholder="Nom du produit" style="display:none;margin-top:6px" oninput="etqApercu(true)">
+        </div>
+        <div class="form-group"><label>Lot *</label><input type="text" id="etq-lot" placeholder="Ex: L2603" oninput="etqApercu(true)"></div>
+        <div class="form-group"><label>Date de fabrication</label><input type="text" id="etq-fab" value="${todayFr()}" placeholder="JJ/MM/AAAA" oninput="etqMajDlc()"></div>
+        <div class="form-group"><label>Type de date</label><select id="etq-type" onchange="etqMajDlc()"><option value="DLC">DLC — à consommer jusqu'au</option><option value="DDM">DDM — à consommer de préférence avant</option></select></div>
+        <div class="form-group"><label>Durée (jours)</label><input type="text" id="etq-jours" placeholder="Ex: 21" oninput="etqMajDlc()"></div>
+        <div class="form-group"><label id="etq-dlc-lib">DLC</label><input type="text" id="etq-dlc" placeholder="JJ/MM/AAAA" oninput="etqApercu(true)"></div>
+        <div class="form-group"><label>Conservation</label><input type="text" id="etq-cons" placeholder="Ex: entre 0 et +4 °C" oninput="etqApercu(true)"></div>
+        <div class="form-group full"><label>Mentions complémentaires</label><input type="text" id="etq-mentions" placeholder="Ex: ne pas recongeler après décongélation" oninput="etqApercu(true)"></div>
+        <div class="form-group"><label>Nombre d'étiquettes</label><input type="text" id="etq-qte" value="1"></div>
+        <div class="form-group"><label>Code-barres</label><select id="etq-code" onchange="etqApercu(true)"><option value="lot">Code 39 du lot</option><option value="none">Aucun</option></select></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="imprimerEtiquettes()">🖨️ Imprimer</button>
+        <button class="btn" style="background:#f5f5f5;color:#555" onclick="etqApercu(true)">👁 Actualiser l'aperçu</button>
+      </div>
+    </div>
+    <div class="etq-preview-panel">
+      <div class="etq-preview-title">Aperçu à l'échelle réelle — ${cfg.w} × ${cfg.h} mm</div>
+      <div class="etq-preview-scroll">
+        <div id="etq-preview" class="etq-preview" style="width:${cfg.w}mm;height:${cfg.h}mm;padding:${cfg.oy}mm ${cfg.ox}mm"></div>
+      </div>
+      <div class="etq-hint">L'impression passe par le pilote de l'imprimante : aucun logiciel ni licence en plus. Choisissez l'imprimante d'étiquettes dans la fenêtre d'impression, échelle 100 %, marges « aucune ».</div>
+    </div>
+  </div>`;
+  setTimeout(etqApercu, 0);
+  return html;
+}
+
+function etqProduitChange(v){
+  const libre = document.getElementById('etq-produit-libre');
+  if (libre) libre.style.display = (v === '__libre') ? '' : 'none';
+  const p = etqProduit(v);
+  if (p) {
+    const type = document.getElementById('etq-type'); if (type) type.value = /^ddm$/i.test(String(p.type || '')) ? 'DDM' : 'DLC';
+    const jours = document.getElementById('etq-jours'); if (jours) jours.value = String(p.jours || '');
+    const cons = document.getElementById('etq-cons'); if (cons) cons.value = p.conservation || '';
+    const men = document.getElementById('etq-mentions'); if (men) men.value = p.mentions || '';
+  }
+  etqMajDlc();
+}
+
+function etqMajDlc(){
+  const fab = (document.getElementById('etq-fab') || {}).value || '';
+  const jours = (document.getElementById('etq-jours') || {}).value || '';
+  const type = (document.getElementById('etq-type') || {}).value || 'DLC';
+  const lib = document.getElementById('etq-dlc-lib');
+  if (lib) lib.textContent = type;
+  const dlc = document.getElementById('etq-dlc');
+  if (dlc && fab && jours) dlc.value = etqAjouteJours(fab, jours);
+  etqApercu(true);
+}
+
+function etqLireForm(){
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const sel = v('etq-produit');
+  return {
+    produit: sel === '__libre' ? v('etq-produit-libre') : sel,
+    lot: v('etq-lot'),
+    fab: v('etq-fab'),
+    type: v('etq-type') || 'DLC',
+    jours: v('etq-jours'),
+    dlc: v('etq-dlc'),
+    cons: v('etq-cons'),
+    mentions: v('etq-mentions'),
+    qte: Math.min(200, Math.max(1, parseInt(v('etq-qte'), 10) || 1)),
+    code: v('etq-code') || 'lot'
+  };
+}
+
+function etqLabelHtml(d, cfg){
+  cfg = cfg || etqCfg();
+  const base = Math.max(0.55, Math.min(2.2, Number(cfg.w) / 50));
+  const coef = base * (Number(cfg.police) / 100 || 1);
+  const fs = v => (v * coef).toFixed(2) + 'mm';
+  const code = (d.code !== 'none' && d.lot) ? etqCode39Svg(d.lot, Math.max(4, Math.min(14, Number(cfg.h) * 0.22))) : '';
+  return `<div class="etq-lbl">
+    <div class="etq-nom" style="font-size:${fs(3.6)}">${esc(d.produit || 'PRODUIT')}</div>
+    <div class="etq-ligne"><span class="etq-lab">Lot</span><span class="etq-val" style="font-size:${fs(3)}">${esc(d.lot || '—')}</span></div>
+    <div class="etq-ligne"><span class="etq-lab">${esc(d.type || 'DLC')}</span><span class="etq-val" style="font-size:${fs(3.4)}">${esc(d.dlc || '—')}</span></div>
+    ${d.cons ? `<div class="etq-cond" style="font-size:${fs(2.2)}">${esc(d.cons)}</div>` : ''}
+    ${d.mentions ? `<div class="etq-cond" style="font-size:${fs(2)}">${esc(d.mentions)}</div>` : ''}
+    ${code ? `<div class="etq-code">${code}<div class="etq-code-txt">${esc(d.lot)}</div></div>` : ''}
+  </div>`;
+}
+
+function etqApercu(){
+  const box = document.getElementById('etq-preview');
+  if (!box) return;
+  box.innerHTML = etqLabelHtml(etqLireForm(), etqCfg());
+}
+
+function etqPrintHtml(d, cfg){
+  const w = etqNum(cfg.w, 50), h = etqNum(cfg.h, 30);
+  const ox = Number(cfg.ox) || 0, oy = Number(cfg.oy) || 0;
+  const label = etqLabelHtml(d, cfg);
+  let pages = '';
+  for (let i = 0; i < d.qte; i++) pages += '<div class="etq-page">' + label + '</div>';
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Étiquettes ' + esc(d.lot) + '</title><style>'
+    + '@page{size:' + w + 'mm ' + h + 'mm;margin:0;}'
+    + 'html,body{margin:0;padding:0;background:#fff;}'
+    + '.etq-page{width:' + w + 'mm;height:' + h + 'mm;box-sizing:border-box;padding:' + oy + 'mm ' + ox + 'mm;page-break-after:always;break-after:page;overflow:hidden;}'
+    + '.etq-page:last-child{page-break-after:auto;break-after:auto;}'
+    + ETQ_LABEL_CSS
+    + '</style></head><body>' + pages
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>'
+    + '</body></html>';
+}
+
+function imprimerEtiquettes(){
+  const cfg = etqCfg();
+  const d = etqLireForm();
+  if (!d.produit) { toast('⚠️ Choisissez un produit', true); return; }
+  if (!d.lot) { toast('⚠️ Le lot est obligatoire', true); return; }
+  if (!d.dlc) { toast('⚠️ La date DLC/DDM est obligatoire', true); return; }
+  if (!etqParseFr(d.dlc)) { toast('⚠️ Date DLC/DDM au format JJ/MM/AAAA', true); return; }
+  const win = window.open('', '_blank');
+  if (!win) { toast('⚠️ Fenêtre bloquée : autorisez les fenêtres surgissantes', true); return; }
+  win.document.open();
+  win.document.write(etqPrintHtml(d, cfg));
+  win.document.close();
+  try {
+    api('logEtiquette', {
+      produit: d.produit, lot: d.lot,
+      dateEtiquette: d.type + ' ' + d.dlc,
+      quantite: d.qte
+    }, { attempts:1, timeout:15000 }).catch(function(){});
+  } catch (e) {}
+  toast('🖨️ Fenêtre d\'impression ouverte — ' + d.qte + ' étiquette' + (d.qte > 1 ? 's' : ''));
+}
+
+function etqMireHtml(cfg){
+  const w = etqNum(cfg.w, 50), h = etqNum(cfg.h, 30);
+  let lignes = '';
+  for (let y = 0; y <= h; y += 5) lignes += '<div class="mire-h" style="top:' + y + 'mm"><span>' + y + '</span></div>';
+  for (let x = 0; x <= w; x += 5) lignes += '<div class="mire-v" style="left:' + x + 'mm"><span>' + x + '</span></div>';
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Mire ' + w + '×' + h + '</title><style>'
+    + '@page{size:' + w + 'mm ' + h + 'mm;margin:0;}'
+    + 'html,body{margin:0;padding:0;background:#fff;font-family:Arial,sans-serif;}'
+    + '.mire{position:relative;width:' + w + 'mm;height:' + h + 'mm;box-sizing:border-box;border:.3mm solid #000;overflow:hidden;}'
+    + '.mire-h{position:absolute;left:0;right:0;height:0;border-top:.15mm solid #000;}'
+    + '.mire-v{position:absolute;top:0;bottom:0;width:0;border-left:.15mm solid #000;}'
+    + '.mire span{position:absolute;left:.6mm;top:-2.4mm;font-size:1.8mm;background:#fff;padding:0 .3mm;}'
+    + '.mire-v span{left:-2.4mm;top:.6mm;}'
+    + '.mire-txt{position:absolute;left:0;right:0;bottom:1mm;text-align:center;font-size:2mm;font-weight:700;}'
+    + '</style></head><body><div class="mire">' + lignes
+    + '<div class="mire-txt">' + w + ' × ' + h + ' mm — mire de calibrage</div></div>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>'
+    + '</body></html>';
+}
+
+function imprimerMire(){
+  const cfg = etqCfg();
+  const win = window.open('', '_blank');
+  if (!win) { toast('⚠️ Fenêtre bloquée : autorisez les fenêtres surgissantes', true); return; }
+  win.document.open();
+  win.document.write(etqMireHtml(cfg));
+  win.document.close();
+}
+
+// ── Réglages format & calibrage (propres au poste) ───────────────────
+function ouvrirEtqConf(){
+  const cfg = etqCfg();
+  const sel = document.getElementById('etqc-preset');
+  if (!sel) return;
+  sel.innerHTML = ETQ_PRESETS.map(p => '<option value="' + p.id + '">' + p.n + '</option>').join('')
+    + '<option value="custom">Autre format (mm)</option>';
+  sel.value = ETQ_PRESETS.some(p => p.id === cfg.preset) ? cfg.preset : 'custom';
+  document.getElementById('etqc-w').value = cfg.w;
+  document.getElementById('etqc-h').value = cfg.h;
+  document.getElementById('etqc-ox').value = cfg.ox;
+  document.getElementById('etqc-oy').value = cfg.oy;
+  document.getElementById('etqc-police').value = cfg.police;
+  document.getElementById('etqconf-modal').style.display = 'flex';
+}
+function fermerEtqConf(){ document.getElementById('etqconf-modal').style.display = 'none'; }
+function etqPresetChange(id){
+  const sel = document.getElementById('etqc-preset');
+  if (sel) sel.value = id;
+  const p = ETQ_PRESETS.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('etqc-w').value = p.w;
+  document.getElementById('etqc-h').value = p.h;
+}
+function etqEnregistrerConf(){
+  const v = id => String((document.getElementById(id) || {}).value || '').trim();
+  const cfg = {
+    preset: v('etqc-preset'),
+    w: etqNum(v('etqc-w'), 50),
+    h: etqNum(v('etqc-h'), 30),
+    ox: Number(String(v('etqc-ox')).replace(',', '.')) || 0,
+    oy: Number(String(v('etqc-oy')).replace(',', '.')) || 0,
+    police: etqNum(v('etqc-police'), 100)
+  };
+  etqSaveCfg(cfg);
+  fermerEtqConf();
+  toast('✅ Format enregistré pour ce poste');
+  renderTab('etiquettes');
+}
+
+// ── Catalogue des produits (nom, durée, conservation) ────────────────
+function ouvrirProduitsEtiquettes(){ renderProduitsEtiquettes(); document.getElementById('produitsetq-modal').style.display = 'flex'; }
+function fermerProduitsEtiquettes(){ document.getElementById('produitsetq-modal').style.display = 'none'; }
+
+function renderProduitsEtiquettes(){
+  const body = document.getElementById('produitsetq-body');
+  if (!body) return;
+  const liste = S.produitsEtiquettes || [];
+  let html = '<div class="prod-row prod-head"><span>Produit</span><span>Type</span><span>Durée (j)</span><span>Conservation</span><span>Mentions</span><span></span><span></span></div>';
+  if (!liste.length) html += '<p style="font-size:12.5px;color:#78909c;line-height:1.5;margin:6px 0 12px">Aucun produit enregistré. Ajoutez-en un ci-dessous : sa durée de vie calculera automatiquement la DLC (ou la DDM) lors de la saisie d\'une étiquette.</p>';
+  liste.forEach((p, i) => {
+    html += '<div class="prod-row">'
+      + '<input type="text" id="prod-nom-' + i + '" value="' + esc(p.nom) + '" placeholder="Nom">'
+      + '<select id="prod-type-' + i + '"><option value="DLC"' + (/^ddm$/i.test(String(p.type || '')) ? '' : ' selected') + '>DLC</option><option value="DDM"' + (/^ddm$/i.test(String(p.type || '')) ? ' selected' : '') + '>DDM</option></select>'
+      + '<input type="text" id="prod-jours-' + i + '" value="' + esc(p.jours) + '" placeholder="21">'
+      + '<input type="text" id="prod-cons-' + i + '" value="' + esc(p.conservation) + '" placeholder="0 et +4 °C">'
+      + '<input type="text" id="prod-mentions-' + i + '" value="' + esc(p.mentions) + '" placeholder="—">'
+      + '<button class="btn-row-save" title="Enregistrer" onclick="enregistrerProduitEtiquette(' + i + ')">✓</button>'
+      + '<button class="btn-row-del" title="Supprimer" onclick="supprimerProduitEtiquette(' + i + ')">🗑</button>'
+      + '</div>';
+  });
+  html += '<div class="prod-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed #d5d5d5">'
+    + '<input type="text" id="prod-nom-new" placeholder="Nouveau produit">'
+    + '<select id="prod-type-new"><option value="DLC">DLC</option><option value="DDM">DDM</option></select>'
+    + '<input type="text" id="prod-jours-new" placeholder="21">'
+    + '<input type="text" id="prod-cons-new" placeholder="0 et +4 °C">'
+    + '<input type="text" id="prod-mentions-new" placeholder="—">'
+    + '<button class="btn-row-save" title="Ajouter" onclick="ajouterProduitEtiquette()">➕</button>'
+    + '<span></span>'
+    + '</div>';
+  body.innerHTML = html;
+}
+
+function rafraichirProduitsEtiquettes(){
+  renderProduitsEtiquettes();
+  if (S.tab === 'etiquettes') renderTab('etiquettes');
+}
+
+async function ajouterProduitEtiquette(){
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const data = { nom:v('prod-nom-new'), type:v('prod-type-new'), jours:v('prod-jours-new'), conservation:v('prod-cons-new'), mentions:v('prod-mentions-new') };
+  if (!data.nom) { toast('⚠️ Le nom du produit est obligatoire', true); return; }
+  if ((S.produitsEtiquettes || []).some(p => String(p.nom).toLowerCase() === data.nom.toLowerCase())) { toast('⚠️ Ce produit existe déjà', true); return; }
+  try {
+    const r = await api('addProduitEtiquette', data);
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    S.produitsEtiquettes.push(Object.assign({ _rowIndex:r._rowIndex, numero:r.numero }, data));
+    rafraichirProduitsEtiquettes();
+    toast('✅ Produit ajouté');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+async function enregistrerProduitEtiquette(i){
+  const p = (S.produitsEtiquettes || [])[i];
+  if (!p) return;
+  const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const maj = { _rowIndex:p._rowIndex, numero:p.numero, nom:v('prod-nom-' + i), type:v('prod-type-' + i), jours:v('prod-jours-' + i), conservation:v('prod-cons-' + i), mentions:v('prod-mentions-' + i) };
+  if (!maj.nom) { toast('⚠️ Le nom du produit est obligatoire', true); return; }
+  try {
+    const r = await api('updateProduitEtiquette', maj);
+    if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    S.produitsEtiquettes[i] = maj;
+    rafraichirProduitsEtiquettes();
+    toast('✅ Produit mis à jour');
+  } catch (e) { toast('❌ ' + e.message, true); }
+}
+
+async function supprimerProduitEtiquette(i){
+  const p = (S.produitsEtiquettes || [])[i];
+  if (!p) return;
+  if (!confirm('Supprimer « ' + p.nom + ' » de la liste ?\n\nLes étiquettes déjà imprimées ne sont pas modifiées.')) return;
+  try {
+    if (p._rowIndex !== '' && p._rowIndex !== undefined) {
+      const r = await api('deleteProduitEtiquette', { _rowIndex:p._rowIndex });
+      if (!r || !r.ok) throw new Error((r && r.error) || 'Erreur serveur');
+    }
+    S.produitsEtiquettes.splice(i, 1);
+    rafraichirProduitsEtiquettes();
+    toast('🗑 Produit supprimé');
   } catch (e) { toast('❌ ' + e.message, true); }
 }
 
