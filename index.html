@@ -1550,7 +1550,14 @@ async function loadMissingPack() {
   const jobs = [];
   if (!S.loaded.has('analyses') || !S.loaded.has('nonconformites') || !S.loaded.has('bacteries')) jobs.push(loadHaccpPack());
   if (!S.loaded.has('etiquettes')) {
-    jobs.push(callWithRetry(() => api('loadProduitsEtiquettes', {}, { attempts: 1, timeout: 30000 }), 2).then(function (r) {
+    jobs.push(api('loadProduitsEtiquettes', {}, { attempts: 1, timeout: 30000 }).then(function (r) {
+      const inconnu = !!(r && r.ok === false && String(r.error || '').indexOf('inconnue') !== -1);
+      if (inconnu) {
+        S.produitsEtiquettes = [];
+        S.etqErr = 'Le serveur de données ne connaît pas encore les étiquettes. Republiez le script Apps Script (nouvelle version), puis rouvrez cet onglet.';
+        S.loaded.add('etiquettes');
+        return;
+      }
       if (!r || r.ok === false) throw new Error((r && r.error) || 'Étiquettes');
       applyPack({ produitsEtiquettes: r.rows || [] });
     }));
