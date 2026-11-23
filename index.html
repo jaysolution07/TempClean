@@ -1007,7 +1007,7 @@ function logout() {
   if (gate) gate.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   // Reset état
-  Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:'',analyses:[],nonConformites:[],bacteries:[],haccpErr:{}});
+  Object.assign(S, {tab:'chaud',checks:{},appChecks:{},comments:{},meta:{},states:{},appareils:[],renaming:{},loaded:new Set(),prelevements:[],pesees:[],machines:[],maintenanceRows:[],maintenanceMachineId:'',editingReleve:null,editingPesee:null,editingMaintenance:null,editingFreezerId:null,freezerItems:[],freezerMeta:{dateDebut:'',dateFin:'',filtreRack:''},freezerDraft:{produit:'',placements:[]},freezerSearch:'',analyses:[],nonConformites:[],bacteries:[],haccpErr:{},produitsEtiquettes:[],etqErr:''});
   S.histoList = null; S.histoData = {}; S.dbId = ''; S.dbVue = 'zones';
   elogRows = [];
   BOOT_LOGS = null;
@@ -1309,7 +1309,7 @@ function startCreep(from, to, label) {
   }, 400);
   return { stop() { clearInterval(id); } };
 }
-const PACK_MODULES = ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer','analyses','nonconformites','bacteries'];
+const PACK_MODULES = ['chaud','froid','autres','biannuel','prelevements','pesees','maintenance','freezer','analyses','nonconformites','bacteries','etiquettes'];
 function packReady() {
   return PACK_MODULES.every(t => S.loaded.has(t));
 }
@@ -1339,6 +1339,7 @@ function restorePackCache(cached) {
   if (Array.isArray(cached.analyses)) { S.analyses = cached.analyses; S.loaded.add('analyses'); }
   if (Array.isArray(cached.nonConformites)) { S.nonConformites = cached.nonConformites; S.loaded.add('nonconformites'); }
   if (Array.isArray(cached.bacteries)) { S.bacteries = cached.bacteries; S.loaded.add('bacteries'); }
+  if (Array.isArray(cached.produitsEtiquettes)) { S.produitsEtiquettes = cached.produitsEtiquettes; S.etqErr = ''; S.loaded.add('etiquettes'); }
 }
 function rememberPack() {
   saveCache({
@@ -1353,7 +1354,8 @@ function rememberPack() {
     freezerMeta: S.freezerMeta || {},
     analyses: S.analyses || [],
     nonConformites: S.nonConformites || [],
-    bacteries: S.bacteries || []
+    bacteries: S.bacteries || [],
+    produitsEtiquettes: S.produitsEtiquettes || []
   });
 }
 function applyPack(r) {
@@ -1390,6 +1392,7 @@ function applyPack(r) {
   if (Array.isArray(r.analyses)) { S.analyses = r.analyses; S.loaded.add('analyses'); }
   if (Array.isArray(r.nonConformites)) { S.nonConformites = r.nonConformites; S.loaded.add('nonconformites'); }
   if (Array.isArray(r.bacteries)) { S.bacteries = r.bacteries; S.loaded.add('bacteries'); }
+  if (Array.isArray(r.produitsEtiquettes)) { S.produitsEtiquettes = r.produitsEtiquettes; S.etqErr = ''; S.loaded.add('etiquettes'); }
   rememberPack();
 }
 function finishPaint() {
@@ -1449,7 +1452,7 @@ async function preloadStepByStep(sid) {
       if (!r || r.ok === false) throw new Error('Congélateur');
       applyPack({ freezerItems: r.items || [], freezerMeta: r.meta || {} });
     }],
-    ['Analyses et non-conformités', 86, 96, async () => { await loadHaccpPack(); }]
+    ['Analyses, non-conformités et étiquettes', 86, 96, async () => { await loadMissingPack(); }]
   ];
   for (let i = 0; i < steps.length; i++) {
     if (sid !== SESSION_ID) return false;
@@ -1507,13 +1510,13 @@ async function preloadAll() {
         applyPack(r);
         if (!(await waitSnapshot(sid))) return false;
       } else applyPack(r);
-      if (!S.loaded.has('analyses') || !S.loaded.has('nonconformites') || !S.loaded.has('bacteries')) {
-        const haccp = startCreep(92, 98, 'Analyses et non-conformités…');
-        try { await loadHaccpPack(); }
+      if (!S.loaded.has('analyses') || !S.loaded.has('nonconformites') || !S.loaded.has('bacteries') || !S.loaded.has('etiquettes')) {
+        const extra = startCreep(92, 98, 'Analyses, non-conformités et étiquettes…');
+        try { await loadMissingPack(); }
         catch (e) {
-          LOAD_FAIL = 'Analyses et non-conformités : ' + (e.message || 'lecture impossible');
+          LOAD_FAIL = e.message || 'Modules complémentaires illisibles';
           return false;
-        } finally { haccp.stop(); }
+        } finally { extra.stop(); }
       }
       if (logs && logs.ok) { elogRows = logs.rows || []; S.loaded.add('elog'); }
       if (sid !== SESSION_ID) return false;
@@ -1542,6 +1545,17 @@ async function loadHaccpPack() {
   if (!n || n.ok === false) throw new Error((n && n.error) || 'Non-conformités');
   if (!b || b.ok === false) throw new Error((b && b.error) || 'Bactéries');
   applyPack({ analyses: a.rows || [], nonConformites: n.rows || [], bacteries: b.rows || [] });
+}
+async function loadMissingPack() {
+  const jobs = [];
+  if (!S.loaded.has('analyses') || !S.loaded.has('nonconformites') || !S.loaded.has('bacteries')) jobs.push(loadHaccpPack());
+  if (!S.loaded.has('etiquettes')) {
+    jobs.push(callWithRetry(() => api('loadProduitsEtiquettes', {}, { attempts: 1, timeout: 30000 }), 2).then(function (r) {
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'Étiquettes');
+      applyPack({ produitsEtiquettes: r.rows || [] });
+    }));
+  }
+  await Promise.all(jobs);
 }
 function runSyncLoop() { return preloadAll(); }
 function retrySync() { preloadAll(); }

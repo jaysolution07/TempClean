@@ -3,7 +3,7 @@
 // ⚠️ Change VERSION à chaque déploiement → force la MàJ sur tous les appareils
 // ════════════════════════════════════════════════════════════════════
 
-const VERSION = 'v2.1.0'; // ← INCRÉMENTER À CHAQUE PUSH (v2.0.1, v2.1.0...)
+const VERSION = 'v2.2.0'; // ← INCRÉMENTER À CHAQUE PUSH (v2.0.1, v2.1.0...)
 const CACHE_NAME = 'tempclean-' + VERSION;
 
 const ASSETS = [
